@@ -100,6 +100,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <div id="saveStatus" class="status"></div>
 </section>
 
+<section class="card" id="aiCard">
+<h3>AI song (ElevenLabs)</h3>
+<p class="muted">Turns your brief into a real song with vocals. Each song uses ElevenLabs credits (about 1,800 per minute on the free plan), so make one at a time.</p>
+<div class="field"><label for="aiLen">Song length</label><select id="aiLen"><option value="30">30 seconds</option><option value="60" selected>60 seconds</option><option value="90">90 seconds</option></select></div>
+<button class="btn primary" id="aiMake" type="button">Make AI song from my brief</button>
+<div id="aiStatus" class="status"></div>
+<audio id="aiPlayer" controls class="hidden" style="width:100%;margin-top:8px"></audio>
+<a id="aiDownload" class="btn secondary hidden" style="display:block;text-align:center;text-decoration:none;margin-top:8px" download="km-production-ai-song.mp3">Download song</a>
+</section>
 <section class="card">
 <h3>5. My saved ideas</h3><p class="muted">Briefs are saved only in this browser on this phone.</p>
 <div id="savedList" class="small">No saved briefs yet.</div>
@@ -244,6 +253,32 @@ $('recBtn').onclick=async()=>{
   $('recBtn').textContent='Record voice';st('Recording saved. Play it below or download it.');
  };
  rec.start();$('recBtn').textContent='Stop recording';st('Recording your voice with the beat...');
+};
+})();
+</script>
+<script>
+(()=>{
+const URL_W='https://km-music.kmproduction626.workers.dev';
+let busy=false,lastUrl=null;
+const st=t=>{$('aiStatus').textContent=t};
+$('aiMake').onclick=async()=>{
+ if(busy)return;
+ let p=$('output').value.trim();
+ if(!p){p=buildBrief();$('output').value=p}
+ busy=true;$('aiMake').textContent='Making your song... (up to 2 minutes)';$('aiMake').disabled=true;
+ st('Sending your brief to the AI. Please wait and keep this page open.');
+ try{
+  const r=await fetch(URL_W,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,seconds:Number($('aiLen').value)})});
+  if(!r.ok){const t=await r.text();throw new Error('Error '+r.status+': '+t.slice(0,220))}
+  const b=await r.blob();
+  if(lastUrl)URL.revokeObjectURL(lastUrl);
+  lastUrl=URL.createObjectURL(b);
+  $('aiPlayer').src=lastUrl;$('aiPlayer').classList.remove('hidden');
+  $('aiDownload').href=lastUrl;$('aiDownload').classList.remove('hidden');
+  $('aiPlayer').play().catch(()=>{});
+  st('Your song is ready. Press play, or download it.');
+ }catch(e){st('Could not make the song. '+e.message)}
+ busy=false;$('aiMake').disabled=false;$('aiMake').textContent='Make AI song from my brief';
 };
 })();
 </script>
