@@ -83,7 +83,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 
 <section class="card" id="studioCard">
 <h3>Studio: beat and your voice</h3>
-<p class="muted">Plays a beat in the genre you chose above. Record your voice over it, then play it back or download it. Use headphones so the beat is not picked up by the mic.</p>
+<p class="muted">Pick a backing track (the built-in beat, an audio file from your phone, or your AI song), record your own voice over it, then play back or download the mix. Use headphones so the beat is not picked up by the mic.</p>
+<div class="field"><label for="backSel">Backing track</label><select id="backSel"><option value="beat">Built-in beat</option></select><input id="backFile" type="file" accept="audio/*" style="margin-top:8px"></div>
 <div class="field"><label for="beatBpm">Tempo: <span id="bpmLabel">112</span> BPM</label><input id="beatBpm" type="range" min="80" max="140" value="112"></div>
 <div class="row"><button class="btn primary" id="beatPlay">Play beat</button><button class="btn secondary" id="recBtn">Record voice</button></div>
 <div id="studioStatus" class="status"></div>
@@ -225,11 +226,24 @@ function tick(){
  const spb=60/$('beatBpm').value/4;
  while(next<ctx.currentTime+.12){play(step,next);next+=spb;step=(step+1)%16;if(step===0)bar++}
 }
+let backEl=null,urls={};
 function startBeat(){
  init();ctx.resume();
- step=0;bar=0;next=ctx.currentTime+.05;timer=setInterval(tick,25);playing=true;$('beatPlay').textContent='Stop beat';
+ const k=$('backSel').value;
+ if(k!=='beat'&&urls[k]){
+  backEl=new Audio(urls[k]);
+  ctx.createMediaElementSource(backEl).connect(master);
+  backEl.onended=()=>{if(rec&&rec.state==='recording')rec.stop();else stopBeat()};
+  backEl.play();
+ }else{
+  step=0;bar=0;next=ctx.currentTime+.05;timer=setInterval(tick,25);
+ }
+ playing=true;$('beatPlay').textContent='Stop beat';
 }
-function stopBeat(){clearInterval(timer);playing=false;$('beatPlay').textContent='Play beat'}
+function stopBeat(){clearInterval(timer);if(backEl){backEl.pause();backEl=null}playing=false;$('beatPlay').textContent='Play beat'}
+function addBack(k,label,url){urls[k]=url;let o=$('backSel').querySelector('option[value="'+k+'"]');if(!o){o=document.createElement('option');o.value=k;$('backSel').append(o)}o.textContent=label;$('backSel').value=k}
+window.kmAddAi=u=>addBack('ai','AI song',u);
+$('backFile').onchange=e=>{const f=e.target.files[0];if(f)addBack('file','My track: '+f.name.slice(0,24),URL.createObjectURL(f))};
 $('beatBpm').oninput=()=>{$('bpmLabel').textContent=$('beatBpm').value};
 document.querySelectorAll('.genre').forEach(b=>b.addEventListener('click',()=>{
  const p=G[b.dataset.genre];if(p){$('beatBpm').value=p.b;$('bpmLabel').textContent=p.b}
@@ -275,6 +289,7 @@ $('aiMake').onclick=async()=>{
   lastUrl=URL.createObjectURL(b);
   $('aiPlayer').src=lastUrl;$('aiPlayer').classList.remove('hidden');
   $('aiDownload').href=lastUrl;$('aiDownload').classList.remove('hidden');
+  if(window.kmAddAi)window.kmAddAi(lastUrl);
   $('aiPlayer').play().catch(()=>{});
   st('Your song is ready. Press play, or download it.');
  }catch(e){st('Could not make the song. '+e.message)}
