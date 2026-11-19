@@ -101,6 +101,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <div id="saveStatus" class="status"></div>
 </section>
 
+<section class="card" id="mixCard">
+<h3>Mix your voice (effects)</h3>
+<p class="muted">Record your voice in the Studio card first. Then set reverb, echo and tone, preview the mix, and download it as a WAV file. Your voice is saved dry, so you can change the effects without singing again.</p>
+<div class="field"><label>Reverb: <span id="rvL">25</span>%</label><input id="rv" type="range" min="0" max="100" value="25"></div>
+<div class="field"><label>Echo: <span id="ecL">10</span>%</label><input id="ec" type="range" min="0" max="100" value="10"></div>
+<div class="field"><label>Tone, dark to bright: <span id="tnL">0</span></label><input id="tn" type="range" min="-6" max="8" value="0"></div>
+<div class="field"><label>Voice volume: <span id="vvL">100</span>%</label><input id="vv" type="range" min="0" max="150" value="100"></div>
+<div class="field"><label>Voice timing: <span id="vtL">0</span> ms (move it if your voice sounds late)</label><input id="vt" type="range" min="-200" max="400" step="10" value="0"></div>
+<div class="row"><button class="btn primary" id="mixPlay" type="button">Preview mix</button><button class="btn secondary" id="mixDl" type="button">Download WAV</button></div>
+<div id="mixStatus" class="status">Record your voice first.</div>
+</section>
+<section class="card" id="refCard">
+<h3>Reference track analyser</h3>
+<p class="muted">Upload a track (like an AI song you use as a reference). The app estimates its tempo, key, chords and bass notes. Download the bass line as a MIDI file to open in your DAW. These are estimates, so check them by ear.</p>
+<input id="refFile" type="file" accept="audio/*">
+<div id="refOut" class="status" style="white-space:pre-wrap;margin-top:8px"></div>
+<div class="row"><button class="btn secondary hidden" id="refMidi" type="button">Download bass MIDI</button><button class="btn secondary hidden" id="refTxt" type="button">Download notes (.txt)</button></div>
+</section>
 <section class="card" id="aiCard">
 <h3>AI song (ElevenLabs)</h3>
 <p class="muted">Turns your brief into a real song with vocals. Each song uses ElevenLabs credits (about 1,800 per minute on the free plan), so make one at a time.</p>
@@ -176,13 +194,13 @@ const G={
 'Afro-pop':{b:105,k:'x.......x.......',h:'x.x.x.x.x.x.x.x.',c:'....x.......x...',l:[],bs:[[0,36],[4,38],[8,40],[12,38]],ch:[[60,64,67],[57,60,64]],ins:'pad',cs:[0,4,8,12]}
 };
 const f=n=>440*Math.pow(2,(n-69)/12);
-let ctx,master,dest,noise,timer,step=0,next=0,playing=false,rec=null,chunks=[],micStream=null,bar=0;
+let ctx,master,dest,noise,timer,step=0,next=0,playing=false,rec=null,chunks=[],micStream=null,bar=0,destB,vch=[],bch=[],vrec=null,brec=null;
 const st=t=>{$('studioStatus').textContent=t};
 function init(){
  if(ctx)return;
  ctx=new (window.AudioContext||window.webkitAudioContext)();
  master=ctx.createGain();master.gain.value=.8;master.connect(ctx.destination);
- dest=ctx.createMediaStreamDestination();master.connect(dest);
+ dest=ctx.createMediaStreamDestination();master.connect(dest);destB=ctx.createMediaStreamDestination();master.connect(destB);
  const n=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),d=n.getChannelData(0);
  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;noise=n;
 }
@@ -258,8 +276,11 @@ $('recBtn').onclick=async()=>{
  ctx.createMediaStreamSource(micStream).connect(dest);
  if(!playing)startBeat();
  chunks=[];rec=new MediaRecorder(dest.stream);
+ vch=[];bch=[];vrec=new MediaRecorder(micStream);vrec.ondataavailable=e=>{if(e.data.size)vch.push(e.data)};brec=new MediaRecorder(destB.stream);brec.ondataavailable=e=>{if(e.data.size)bch.push(e.data)};vrec.start();brec.start();
  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
  rec.onstop=()=>{
+  let n=2;const fin=()=>{if(--n)return;const k=$('backSel').value;window.kmTake={voice:new Blob(vch,{type:'audio/webm'}),back:new Blob(bch,{type:'audio/webm'}),backUrl:(k!=='beat'&&urls[k])||null};if(window.kmTakeReady)window.kmTakeReady()};
+  vrec.onstop=fin;brec.onstop=fin;vrec.stop();brec.stop();
   micStream.getTracks().forEach(t=>t.stop());stopBeat();
   const blob=new Blob(chunks,{type:rec.mimeType||'audio/webm'}),u=URL.createObjectURL(blob);
   $('recPlayer').src=u;$('recPlayer').classList.remove('hidden');
@@ -295,6 +316,129 @@ $('aiMake').onclick=async()=>{
  }catch(e){st('Could not make the song. '+e.message)}
  busy=false;$('aiMake').disabled=false;$('aiMake').textContent='Make AI song from my brief';
 };
+})();
+</script>
+<script>
+(()=>{
+const st=t=>{$('mixStatus').textContent=t};
+const val=()=>({rv:+$('rv').value,ec:+$('ec').value,tn:+$('tn').value,vv:+$('vv').value,vt:+$('vt').value});
+['rv','ec','tn','vv','vt'].forEach(i=>$(i).oninput=()=>{$(i+'L').textContent=$(i).value});
+function ir(c){const n=Math.floor(c.sampleRate*2.2),b=c.createBuffer(2,n,c.sampleRate);for(let k=0;k<2;k++){const d=b.getChannelData(k);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.5)}return b}
+function build(c,v,vb,bb){
+ const out=c.createGain();out.connect(c.destination);
+ if(bb){const s=c.createBufferSource();s.buffer=bb;const g=c.createGain();g.gain.value=.8;s.connect(g);g.connect(out);s.start(c.currentTime+Math.max(0,-v.vt/1000))}
+ const g=c.createGain();g.gain.value=v.vv/100;const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=90;
+ const sh=c.createBiquadFilter();sh.type='highshelf';sh.frequency.value=6000;sh.gain.value=v.tn;
+ g.connect(hp);hp.connect(sh);sh.connect(out);
+ const cv=c.createConvolver();cv.buffer=ir(c);const rg=c.createGain();rg.gain.value=v.rv/100*1.2;sh.connect(cv);cv.connect(rg);rg.connect(out);
+ const d=c.createDelay(1);d.delayTime.value=.32;const fb=c.createGain();fb.gain.value=.35;const eg=c.createGain();eg.gain.value=v.ec/100;
+ sh.connect(d);d.connect(fb);fb.connect(d);d.connect(eg);eg.connect(out);
+ const s=c.createBufferSource();s.buffer=vb;s.connect(g);s.start(c.currentTime+Math.max(0,v.vt/1000));
+}
+async function bufs(){
+ const t=window.kmTake;if(!t)throw new Error('Record your voice first.');
+ const oc=new OfflineAudioContext(2,44100,44100),dec=b=>b.arrayBuffer().then(a=>oc.decodeAudioData(a));
+ const vb=await dec(t.voice);let bb=null;
+ if(t.backUrl)bb=await dec(await (await fetch(t.backUrl)).blob());else if(t.back&&t.back.size)bb=await dec(t.back);
+ return{vb,bb};
+}
+let pc=null;
+$('mixPlay').onclick=async()=>{
+ try{if(pc){pc.close();pc=null;$('mixPlay').textContent='Preview mix';return}
+  st('Preparing...');const{vb,bb}=await bufs();pc=new AudioContext();build(pc,val(),vb,bb);
+  $('mixPlay').textContent='Stop preview';st('Playing. To change effects, stop, move a slider and preview again.');
+  setTimeout(()=>{if(pc){pc.close();pc=null;$('mixPlay').textContent='Preview mix';st('Done.')}},(Math.max(vb.duration,bb?bb.duration:0)+3)*1000);
+ }catch(e){st(e.message)}
+};
+function wav(b){const n=b.length,d=new DataView(new ArrayBuffer(44+n*4));const w=(o,s)=>[...s].forEach((c,i)=>d.setUint8(o+i,c.charCodeAt(0)));
+ w(0,'RIFF');d.setUint32(4,36+n*4,true);w(8,'WAVEfmt ');d.setUint32(16,16,true);d.setUint16(20,1,true);d.setUint16(22,2,true);d.setUint32(24,b.sampleRate,true);d.setUint32(28,b.sampleRate*4,true);d.setUint16(32,4,true);d.setUint16(34,16,true);w(36,'data');d.setUint32(40,n*4,true);
+ const L=b.getChannelData(0),R=b.numberOfChannels>1?b.getChannelData(1):L;let o=44;
+ for(let i=0;i<n;i++){for(const x of [L[i],R[i]]){const s=Math.max(-1,Math.min(1,x));d.setInt16(o,s<0?s*32768:s*32767,true);o+=2}}
+ return new Blob([d],{type:'audio/wav'})}
+$('mixDl').onclick=async()=>{
+ try{st('Rendering your mix...');const{vb,bb}=await bufs(),v=val();
+  const dur=Math.max(vb.duration,bb?bb.duration:0)+3,oc=new OfflineAudioContext(2,Math.ceil(dur*44100),44100);
+  build(oc,v,vb,bb);const r=await oc.startRendering();
+  const a=document.createElement('a');a.href=URL.createObjectURL(wav(r));a.download='km-production-mix.wav';document.body.append(a);a.click();a.remove();st('Mix downloaded.');
+ }catch(e){st(e.message)}
+};
+window.kmTakeReady=()=>st('Voice recorded. Set your effects, then preview or download.');
+})();
+</script>
+<script>
+(()=>{
+const NN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function analyze(x,sr){
+ const f=Math.max(1,Math.round(sr/11025)),n=Math.floor(x.length/f),y=new Float32Array(n);
+ for(let i=0;i<n;i++){let s=0;for(let k=0;k<f;k++)s+=x[i*f+k];y[i]=s/f}
+ const R=sr/f,H=128,m=Math.floor(n/H),e=new Float32Array(m),o=new Float32Array(m);
+ for(let i=0;i<m;i++){let s=0;for(let k=0;k<H;k++){const v=y[i*H+k];s+=v*v}e[i]=Math.sqrt(s/H)}
+ for(let i=1;i<m;i++)o[i]=Math.max(0,e[i]-e[i-1]);
+ const fr=R/H,lo=Math.round(fr*60/160),hi=Math.round(fr*60/80),ac={};let best=0,bl=lo;
+ for(let l=lo-1;l<=hi+1;l++){let s=0;for(let i=l;i<m;i++)s+=o[i]*o[i-l];ac[l]=s}
+ for(let l=lo;l<=hi;l++)if(ac[l]>best){best=ac[l];bl=l}
+ const dd=ac[bl-1]-2*ac[bl]+ac[bl+1],lr=bl+(dd?0.5*(ac[bl-1]-ac[bl+1])/dd:0),bpm=Math.round(600*fr/lr)/10;
+ const N=4096,F=Math.floor(n/N),hw=new Float32Array(N),co=[],ch=[];
+ for(let i=0;i<N;i++)hw[i]=.5-.5*Math.cos(2*Math.PI*i/N);
+ for(let k=0;k<60;k++)co.push(2*Math.cos(2*Math.PI*65.406*Math.pow(2,k/12)/R));
+ for(let fi=0;fi<F;fi++){const c=new Float32Array(12);
+  for(let k=0;k<60;k++){let s1=0,s2=0;const cc=co[k];
+   for(let i=0;i<N;i++){const s=y[fi*N+i]*hw[i]+cc*s1-s2;s2=s1;s1=s}
+   c[k%12]+=Math.sqrt(Math.max(0,s1*s1+s2*s2-cc*s1*s2))}
+  ch.push(c)}
+ const tot=new Float32Array(12);ch.forEach(c=>c.forEach((v,i)=>tot[i]+=v));
+ const MJ=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88],MN=[6.33,2.68,3.52,5.38,2.6,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+ const cor=(a,b)=>{const ma=a.reduce((p,v)=>p+v,0)/12,mb=b.reduce((p,v)=>p+v,0)/12;let s=0,x1=0,x2=0;for(let i=0;i<12;i++){s+=(a[i]-ma)*(b[i]-mb);x1+=(a[i]-ma)**2;x2+=(b[i]-mb)**2}return s/Math.sqrt(x1*x2||1)};
+ let key='?',kb=-9;for(let t=0;t<12;t++){const r=Array.from({length:12},(_,i)=>tot[(i+t)%12]);
+  const a=cor(r,MJ),b=cor(r,MN);if(a>kb){kb=a;key=NN[t]+' major'}if(b>kb){kb=b;key=NN[t]+' minor'}}
+ const fpb=Math.max(1,Math.round((240/bpm)/(N/R))),chords=[];
+ for(let b=0;b+fpb<=F&&chords.length<32;b+=fpb){const c=new Float32Array(12);for(let j=0;j<fpb;j++)ch[b+j].forEach((v,i)=>c[i]+=v);
+  let bs=-1e9,nm='?';for(let t=0;t<12;t++){const mj=c[t]+c[(t+4)%12]+c[(t+7)%12],mi=c[t]+c[(t+3)%12]+c[(t+7)%12];
+   if(mj>bs){bs=mj;nm=NN[t]}if(mi*1.02>bs){bs=mi*1.02;nm=NN[t]+'m'}}chords.push(nm)}
+ const R2=R/2,bz=new Float32Array(Math.floor(n/2));let lp=0;
+ for(let i=0;i<n;i++){lp+=.12*(y[i]-lp);if(!(i&1)&&(i>>1)<bz.length)bz[i>>1]=lp}
+ const FL=512,HP=256,mnL=Math.floor(R2/220),mxL=Math.floor(R2/40),nf=Math.max(0,Math.floor((bz.length-FL-mxL)/HP)),rm=[],md=[];let mx=0;
+ for(let fi=0;fi<nf;fi++){let s=0;for(let i=0;i<FL;i++){const v=bz[fi*HP+i];s+=v*v}rm.push(Math.sqrt(s/FL));mx=Math.max(mx,rm[fi])}
+ for(let fi=0;fi<nf;fi++){if(rm[fi]<.2*mx){md.push(-1);continue}
+  const o0=fi*HP;let e0=0;for(let i=0;i<FL;i++)e0+=bz[o0+i]**2;const r=[];let gm=0;
+  for(let l=mnL;l<=mxL;l++){let s=0;for(let i=0;i<FL;i++)s+=bz[o0+i]*bz[o0+i+l];r[l]=s/(e0||1);gm=Math.max(gm,r[l])}
+  let pl=-1;for(let l=mnL+1;l<mxL;l++)if(r[l]>=.85*gm&&r[l]>=r[l-1]&&r[l]>=r[l+1]){pl=l;break}
+  md.push(gm<.5||pl<0?-1:Math.round(69+12*Math.log2(R2/pl/440)))}
+ const sm=md.map((v,i)=>{const a=[md[i-1],v,md[i+1]].filter(z=>z!==undefined).sort((p,q)=>p-q);return a[Math.floor(a.length/2)]});
+ const bass=[];let i0=0;
+ for(let i=1;i<=sm.length;i++){if(i===sm.length||sm[i]!==sm[i0]){if(sm[i0]>=0&&i-i0>=4)bass.push({midi:sm[i0],t:i0*HP/R2,d:(i-i0)*HP/R2});i0=i}}
+ return{bpm,key,chords,bass};
+}
+function midiFile(bass,bpm){
+ const T=480,tk=s=>Math.round(s*bpm/60*T),ev=[];
+ bass.forEach(b=>{ev.push([tk(b.t),1,b.midi]);ev.push([tk(b.t+b.d*.95),0,b.midi])});
+ ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+ const vlq=v=>{const a=[v&127];while(v>>=7)a.unshift((v&127)|128);return a};
+ const us=Math.round(6e7/bpm),tr=[0,255,81,3,us>>16&255,us>>8&255,us&255];let last=0;
+ ev.forEach(([t,on,n])=>{tr.push(...vlq(t-last),on?0x90:0x80,n,on?96:0);last=t});
+ tr.push(0,255,47,0);
+ const h=[77,84,104,100,0,0,0,6,0,0,0,1,T>>8,T&255,77,84,114,107,tr.length>>24&255,tr.length>>16&255,tr.length>>8&255,tr.length&255];
+ return new Uint8Array([...h,...tr]);
+}
+let last=null;const out=$('refOut');
+const dl=(blob,name)=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove()};
+$('refFile').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ out.textContent='Analysing... this can take up to a minute on a phone.';$('refMidi').classList.add('hidden');$('refTxt').classList.add('hidden');
+ try{
+  const oc=new OfflineAudioContext(2,44100,44100),ab=await oc.decodeAudioData(await f.arrayBuffer());
+  const len=Math.min(ab.length,44100*120),L=ab.getChannelData(0),R=ab.numberOfChannels>1?ab.getChannelData(1):L,x=new Float32Array(len);
+  for(let i=0;i<len;i++)x[i]=(L[i]+R[i])/2;
+  await new Promise(r=>setTimeout(r,60));
+  const r=analyze(x,44100);last=r;
+  const names=r.bass.slice(0,24).map(b=>NN[b.midi%12]+(Math.floor(b.midi/12)-1)).join(' ');
+  last.text='File: '+f.name+'\nTempo: about '+r.bpm+' BPM\nKey: '+r.key+'\nChords per bar: '+r.chords.join(' ')+'\nBass notes (first 24): '+names+'\n';
+  out.textContent=last.text+'\nThese are estimates. Check them by ear in your DAW.';
+  $('refMidi').classList.remove('hidden');$('refTxt').classList.remove('hidden');
+ }catch(err){out.textContent='Could not analyse this file. Try an MP3 or WAV.'}
+};
+$('refMidi').onclick=()=>last&&dl(new Blob([midiFile(last.bass,last.bpm)],{type:'audio/midi'}),'bass-line.mid');
+$('refTxt').onclick=()=>last&&dl(new Blob([last.text],{type:'text/plain'}),'reference-notes.txt');
 })();
 </script>
 </body></html>
