@@ -113,14 +113,26 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <div id="mixStatus" class="status">Record your voice first.</div>
 </section>
 <section class="card" id="refCard">
-<h3>Reference track analyser and piano roll</h3>
-<p class="muted">Upload a track or a single stem (for example a bass stem from StemSplit). The app estimates tempo, key, chords and the notes played, and draws them on a piano roll. Download the notes as a MIDI file for your DAW. Results are estimates, so check them by ear. Works best on one instrument at a time.</p>
-<div class="field"><label for="refMode">What are you uploading?</label><select id="refMode"><option value="bass">Bass (low notes, one at a time)</option><option value="melody">Melody (one note at a time)</option></select></div>
+<h3>Reference analyser and piano roll</h3>
+<p class="muted">Upload a track or one stem. Choose what it is first. Bass and melody show together on the piano roll (gold = bass, green = melody). Drums show on their own lanes. Download MIDI for your DAW. Results are estimates, so check them by ear. Works best on one instrument at a time.</p>
+<div class="field"><label for="refMode">What are you uploading?</label><select id="refMode"><option value="bass">Bass (one note at a time)</option><option value="melody">Melody (one note at a time)</option><option value="drums">Drums (kick, snare, hi-hat)</option></select></div>
 <input id="refFile" type="file" accept="audio/*">
 <div id="refOut" class="status" style="white-space:pre-wrap;margin-top:8px"></div>
 <div style="overflow-x:auto;margin-top:8px;border-radius:10px"><canvas id="roll" width="300" height="10" style="display:block"></canvas></div>
+<div style="overflow-x:auto;margin-top:6px;border-radius:10px"><canvas id="rollD" width="300" height="10" style="display:block"></canvas></div>
 <div class="row"><button class="btn secondary hidden" id="rollPlay" type="button">Play detected notes</button><button class="btn secondary hidden" id="refMidi" type="button">Download MIDI</button></div>
 <div class="row"><button class="btn secondary hidden" id="refTxt" type="button">Download notes (.txt)</button></div>
+</section>
+<section class="card" id="stemCard">
+<h3>Split a song into stems</h3>
+<p class="muted">Upload a song under 25 MB. The app splits it into vocals, drums, bass and other. Each stem has an ON/OFF switch, a WAV download and an Analyse button. Only use songs you have the rights to. Each minute of audio uses one StemSplit minute.</p>
+<input id="stFile" type="file" accept="audio/*">
+<button class="btn primary" id="stGo" type="button" style="margin-top:8px">Split into stems</button>
+<div id="stStatus" class="status"></div>
+<div class="row"><button class="btn secondary" id="stHide" type="button">Instrumental (hide vocals)</button><button class="btn secondary" id="stVoc" type="button">Vocals only</button></div>
+<div class="row"><button class="btn secondary" id="stAll" type="button">All on</button><button class="btn primary" id="stPlay" type="button">Play stems</button></div>
+<button class="btn secondary" id="stMixDl" type="button">Download current mix (WAV)</button>
+<div id="stList"></div>
 </section>
 <section class="card" id="aiCard">
 <h3>AI song (ElevenLabs)</h3>
@@ -366,6 +378,7 @@ $('mixDl').onclick=async()=>{
  }catch(e){st(e.message)}
 };
 window.kmTakeReady=()=>st('Voice recorded. Set your effects, then preview or download.');
+window.kmWav=wav;
 })();
 </script>
 <script>
@@ -399,6 +412,7 @@ function analyze(x,sr,mode){
  for(let b=0;b+fpb<=F&&chords.length<32;b+=fpb){const c=new Float32Array(12);for(let j=0;j<fpb;j++)ch[b+j].forEach((v,i)=>c[i]+=v);
   let bs=-1e9,nm='?';for(let t=0;t<12;t++){const mj=c[t]+c[(t+4)%12]+c[(t+7)%12],mi=c[t]+c[(t+3)%12]+c[(t+7)%12];
    if(mj>bs){bs=mj;nm=NN[t]}if(mi*1.02>bs){bs=mi*1.02;nm=NN[t]+'m'}}chords.push(nm)}
+ if(mode==='drums')return{bpm,key,chords,bass:[]};
  const R2=mel?R:R/2,bz=mel?y.slice():new Float32Array(Math.floor(n/2));let lp=0;
  if(!mel)for(let i=0;i<n;i++){lp+=.12*(y[i]-lp);if(!(i&1)&&(i>>1)<bz.length)bz[i>>1]=lp}
  const FL=mel?1024:512,HP=mel?512:256,mnL=Math.floor(R2/(mel?1000:220)),mxL=Math.floor(R2/(mel?100:40)),nf=Math.max(0,Math.floor((bz.length-FL-mxL)/HP)),rm=[],md=[];let mx=0;
@@ -413,60 +427,131 @@ function analyze(x,sr,mode){
  for(let i=1;i<=sm.length;i++){if(i===sm.length||sm[i]!==sm[i0]){if(sm[i0]>=0&&i-i0>=4)bass.push({midi:sm[i0],t:i0*HP/R2,d:(i-i0)*HP/R2});i0=i}}
  return{bpm,key,chords,bass};
 }
-function midiFile(bass,bpm){
+function midiFile(bass,bpm,ch){ch=ch||0;
  const T=480,tk=s=>Math.round(s*bpm/60*T),ev=[];
  bass.forEach(b=>{ev.push([tk(b.t),1,b.midi]);ev.push([tk(b.t+b.d*.95),0,b.midi])});
  ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
  const vlq=v=>{const a=[v&127];while(v>>=7)a.unshift((v&127)|128);return a};
  const us=Math.round(6e7/bpm),tr=[0,255,81,3,us>>16&255,us>>8&255,us&255];let last=0;
- ev.forEach(([t,on,n])=>{tr.push(...vlq(t-last),on?0x90:0x80,n,on?96:0);last=t});
+ ev.forEach(([t,on,n])=>{tr.push(...vlq(t-last),on?0x90|ch:0x80|ch,n,on?96:0);last=t});
  tr.push(0,255,47,0);
  const h=[77,84,104,100,0,0,0,6,0,0,0,1,T>>8,T&255,77,84,114,107,tr.length>>24&255,tr.length>>16&255,tr.length>>8&255,tr.length&255];
  return new Uint8Array([...h,...tr]);
 }
-let last=null,xs=null,fname='';const out=$('refOut'),cv=$('roll');
+
+function drumHits(x,sr){
+ const lp=(a,fc)=>{const k=1-Math.exp(-2*Math.PI*fc/sr),o=new Float32Array(a.length);let s=0;for(let i=0;i<a.length;i++){s+=k*(a[i]-s);o[i]=s}return o};
+ const l1=lp(x,150),l2=lp(x,5000),B={kick:l1,snare:new Float32Array(x.length),hat:new Float32Array(x.length)};
+ for(let i=0;i<x.length;i++){B.snare[i]=l2[i]-l1[i];B.hat[i]=x[i]-l2[i]}
+ const H=256,hits=[];
+ for(const k of ['kick','snare','hat']){
+  const a=B[k],m=Math.floor(a.length/H),e=new Float32Array(m),f=new Float32Array(m);
+  for(let i=0;i<m;i++){let s=0;for(let j=0;j<H;j++){const v=a[i*H+j];s+=v*v}e[i]=Math.sqrt(s/H)}
+  let sum=0,mx=0;for(let i=1;i<m;i++){f[i]=Math.max(0,e[i]-e[i-1]);sum+=f[i];mx=Math.max(mx,f[i])}
+  const mean=sum/m;let v=0;for(let i=1;i<m;i++)v+=(f[i]-mean)**2;const th=Math.max(mean+2*Math.sqrt(v/m),.25*mx);let last=-99;
+  for(let i=1;i<m-1;i++)if(f[i]>th&&f[i]>=f[i-1]&&f[i]>=f[i+1]&&(i-last)*H/sr>.07){hits.push({t:i*H/sr,type:k,s:f[i]/(mx||1)});last=i}}
+ const near=(h,ty)=>hits.some(o=>o.type===ty&&Math.abs(o.t-h.t)<.035);
+ return hits.filter(h=>!(h.type==='snare'&&h.s<.6&&near(h,'kick'))&&!(h.type==='hat'&&h.s<.6&&near(h,'snare'))).sort((a,b)=>a.t-b.t);
+}
+const res={bass:null,melody:null,drums:null};let xs=null,fname='';const out=$('refOut'),cv=$('roll'),cd=$('rollD');
 const dl=(blob,name)=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove()};
-const nm=m=>NN[m%12]+(Math.floor(m/12)-1);
+const nm=m=>NN[m%12]+(Math.floor(m/12)-1),DM={kick:36,snare:38,hat:42};
 function draw(){
- const nt=last.bass,g0=cv.getContext('2d');
- if(!nt.length){cv.width=320;cv.height=40;g0.fillStyle='#bbb';g0.font='14px sans-serif';g0.fillText('No clear notes found.',8,24);return}
- const PX=70,H=280,lo=Math.min(...nt.map(b=>b.midi))-2,hi=Math.max(...nt.map(b=>b.midi))+2,rng=Math.max(hi-lo+1,24),rh=H/rng,dur=Math.max(...nt.map(b=>b.t+b.d)),W=Math.max(320,Math.ceil(dur*PX)+40);
- cv.width=W;cv.height=H;const g=cv.getContext('2d');g.fillStyle='#141414';g.fillRect(0,0,W,H);
- for(let m=lo;m<lo+rng;m++){const y=H-(m-lo+1)*rh,bk=[1,3,6,8,10].includes(((m%12)+12)%12);g.fillStyle=bk?'#202020':'#181818';g.fillRect(0,y,W,rh);g.fillStyle='#2a2a2a';g.fillRect(0,y,W,1);
-  if(m%12===0){g.fillStyle='#9a8a60';g.font='10px sans-serif';g.fillText('C'+(Math.floor(m/12)-1),3,y+rh-2)}}
- const bs=60/last.bpm;for(let k=0;k*bs*PX<W;k++){g.fillStyle=k%4===0?'#4a4a4a':'#2c2c2c';g.fillRect(k*bs*PX,0,1,H)}
- nt.forEach(b=>{const y=H-(b.midi-lo+1)*rh;g.fillStyle='#e2b04a';g.fillRect(b.t*PX,y+1,Math.max(3,b.d*PX-1),Math.max(3,rh-2))});
+ const L=[['bass','#e2b04a'],['melody','#4ec9b0']].filter(([k])=>res[k]&&res[k].bass.length),g0=cv.getContext('2d');
+ if(!L.length){cv.width=320;cv.height=30;g0.fillStyle='#999';g0.font='13px sans-serif';g0.fillText('Piano roll: upload a bass or melody stem.',6,20)}
+ else{const nt=L.flatMap(([k])=>res[k].bass),bpm=res[L[0][0]].bpm,PX=70,H=280,lo=Math.min(...nt.map(b=>b.midi))-2,hi=Math.max(...nt.map(b=>b.midi))+2,rng=Math.max(hi-lo+1,24),rh=H/rng,dur=Math.max(...nt.map(b=>b.t+b.d)),W=Math.max(320,Math.ceil(dur*PX)+40);
+  cv.width=W;cv.height=H;const g=cv.getContext('2d');g.fillStyle='#141414';g.fillRect(0,0,W,H);
+  for(let m=lo;m<lo+rng;m++){const y=H-(m-lo+1)*rh,bk=[1,3,6,8,10].includes(((m%12)+12)%12);g.fillStyle=bk?'#202020':'#181818';g.fillRect(0,y,W,rh);g.fillStyle='#2a2a2a';g.fillRect(0,y,W,1);if(m%12===0){g.fillStyle='#9a8a60';g.font='10px sans-serif';g.fillText('C'+(Math.floor(m/12)-1),3,y+rh-2)}}
+  const bs=60/bpm;for(let k=0;k*bs*PX<W;k++){g.fillStyle=k%4===0?'#4a4a4a':'#2c2c2c';g.fillRect(k*bs*PX,0,1,H)}
+  L.forEach(([k,c])=>res[k].bass.forEach(b=>{const y=H-(b.midi-lo+1)*rh;g.fillStyle=c;g.fillRect(b.t*PX,y+1,Math.max(3,b.d*PX-1),Math.max(3,rh-2))}))}
+ const h=res.drums;if(!h){cd.width=1;cd.height=1;return}
+ const PX=70,H=96,dur=h.hits.length?h.hits[h.hits.length-1].t:1,W=Math.max(320,Math.ceil(dur*PX)+40);cd.width=W;cd.height=H;const g=cd.getContext('2d');g.fillStyle='#141414';g.fillRect(0,0,W,H);
+ const lane={hat:0,snare:1,kick:2},col={hat:'#9fd0ff',snare:'#ff9f7a',kick:'#e2b04a'};
+ Object.keys(lane).forEach(k=>{g.fillStyle='#2a2a2a';g.fillRect(0,(lane[k]+1)*32-1,W,1);g.fillStyle='#777';g.font='10px sans-serif';g.fillText(k,3,lane[k]*32+11)});
+ const bs=60/h.bpm;for(let k=0;k*bs*PX<W;k++){g.fillStyle=k%4===0?'#4a4a4a':'#2c2c2c';g.fillRect(k*bs*PX,0,1,H)}
+ h.hits.forEach(o=>{g.fillStyle=col[o.type];g.fillRect(o.t*PX,lane[o.type]*32+3,4,26)});
 }
 function run(){
- if(!xs)return;const mode=$('refMode').value;
- out.textContent='Analysing... this can take up to a minute on a phone.';
+ if(!xs)return;const mode=$('refMode').value;out.textContent='Analysing... this can take up to a minute on a phone.';
  ['refMidi','refTxt','rollPlay'].forEach(i=>$(i).classList.add('hidden'));
  setTimeout(()=>{try{
-  const r=analyze(xs,44100,mode);last=r;
-  const names=r.bass.slice(0,24).map(b=>nm(b.midi)).join(' ');
-  last.text='File: '+fname+'\nTempo: about '+r.bpm+' BPM\nKey: '+r.key+'\nChords per bar: '+r.chords.join(' ')+'\nNotes found: '+r.bass.length+'\nFirst notes: '+names+'\n';
-  out.textContent=last.text+'\nEstimates only. Check by ear.';
-  draw();['refMidi','refTxt','rollPlay'].forEach(i=>$(i).classList.remove('hidden'));
+  const r=analyze(xs,44100,mode);let t='File: '+fname+'\nType: '+mode+'\nTempo: about '+r.bpm+' BPM\nKey: '+r.key+'\nChords per bar: '+r.chords.join(' ')+'\n';
+  if(mode==='drums'){r.hits=drumHits(xs,44100);const c={kick:0,snare:0,hat:0};r.hits.forEach(o=>c[o.type]++);t+='Hits found: kick '+c.kick+', snare '+c.snare+', hi-hat '+c.hat+'\n'}
+  else t+='Notes found: '+r.bass.length+'\nFirst notes: '+r.bass.slice(0,24).map(b=>nm(b.midi)).join(' ')+'\n';
+  r.text=t;res[mode]=r;out.textContent=t+'\nEstimates only. Check by ear.';draw();
+  ['refMidi','refTxt'].forEach(i=>$(i).classList.remove('hidden'));if(mode!=='drums')$('rollPlay').classList.remove('hidden');
  }catch(e){out.textContent='Could not analyse this file.'}},60);
 }
+const load=(ab,name)=>{const len=Math.min(ab.length,44100*120),L=ab.getChannelData(0),R=ab.numberOfChannels>1?ab.getChannelData(1):L;xs=new Float32Array(len);for(let i=0;i<len;i++)xs[i]=(L[i]+R[i])/2;fname=name;run()};
+window.kmAnalyse=(ab,name,mode)=>{$('refMode').value=mode;load(ab,name);$('refCard').scrollIntoView({behavior:'smooth'})};
 $('refMode').onchange=run;
-$('refFile').onchange=async e=>{
- const f=e.target.files[0];if(!f)return;fname=f.name;out.textContent='Reading file...';
- try{const oc=new OfflineAudioContext(2,44100,44100),ab=await oc.decodeAudioData(await f.arrayBuffer());
-  const len=Math.min(ab.length,44100*120),L=ab.getChannelData(0),R=ab.numberOfChannels>1?ab.getChannelData(1):L;xs=new Float32Array(len);
-  for(let i=0;i<len;i++)xs[i]=(L[i]+R[i])/2;run();
- }catch(err){out.textContent='Could not read this file. Try an MP3 or WAV.'}
-};
+$('refFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;out.textContent='Reading file...';
+ try{load(await new OfflineAudioContext(2,44100,44100).decodeAudioData(await f.arrayBuffer()),f.name)}catch(err){out.textContent='Could not read this file. Try an MP3 or WAV.'}};
 let pcx=null;const stopP=()=>{if(pcx){pcx.close();pcx=null}$('rollPlay').textContent='Play detected notes'};
 $('rollPlay').onclick=()=>{
- if(pcx){stopP();return}if(!last)return;pcx=new AudioContext();const t0=pcx.currentTime+.1;let end=0;
- last.bass.forEach(b=>{const o=pcx.createOscillator(),g=pcx.createGain();o.type='triangle';o.frequency.value=440*Math.pow(2,(b.midi-69)/12);
-  g.gain.setValueAtTime(0,t0+b.t);g.gain.linearRampToValueAtTime(.3,t0+b.t+.01);g.gain.setValueAtTime(.3,t0+b.t+b.d*.9);g.gain.linearRampToValueAtTime(0,t0+b.t+b.d);
-  o.connect(g);g.connect(pcx.destination);o.start(t0+b.t);o.stop(t0+b.t+b.d+.05);end=Math.max(end,b.t+b.d)});
+ if(pcx){stopP();return}pcx=new AudioContext();const t0=pcx.currentTime+.1;let end=0;
+ [['bass','triangle'],['melody','sine']].forEach(([k,ty])=>res[k]&&res[k].bass.forEach(b=>{const o=pcx.createOscillator(),g=pcx.createGain();o.type=ty;o.frequency.value=440*Math.pow(2,(b.midi-69)/12);
+  g.gain.setValueAtTime(0,t0+b.t);g.gain.linearRampToValueAtTime(.25,t0+b.t+.01);g.gain.setValueAtTime(.25,t0+b.t+b.d*.9);g.gain.linearRampToValueAtTime(0,t0+b.t+b.d);
+  o.connect(g);g.connect(pcx.destination);o.start(t0+b.t);o.stop(t0+b.t+b.d+.05);end=Math.max(end,b.t+b.d)}));
  $('rollPlay').textContent='Stop';setTimeout(stopP,(end+1)*1000);
 };
-$('refMidi').onclick=()=>last&&dl(new Blob([midiFile(last.bass,last.bpm)],{type:'audio/midi'}),'notes.mid');
-$('refTxt').onclick=()=>last&&dl(new Blob([last.text],{type:'text/plain'}),'reference-notes.txt');
+$('refMidi').onclick=()=>{const m=$('refMode').value,r=res[m];if(!r)return;
+ if(m==='drums')dl(new Blob([midiFile(r.hits.map(o=>({midi:DM[o.type],t:o.t,d:.1})),r.bpm,9)],{type:'audio/midi'}),'drums.mid');
+ else dl(new Blob([midiFile(r.bass,r.bpm)],{type:'audio/midi'}),m+'.mid')};
+$('refTxt').onclick=()=>{const r=res[$('refMode').value];r&&dl(new Blob([r.text],{type:'text/plain'}),'reference-notes.txt')};
+})();
+</script>
+<script>
+(()=>{
+const W='https://km-music.kmproduction626.workers.dev',N=['vocals','drums','bass','other'];
+const st=t=>{$('stStatus').textContent=t};
+let bufs={},blobs={},on={},playing=false,pctx=null;
+const dlb=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove()};
+function stop(){if(pctx){pctx.close();pctx=null}playing=false;$('stPlay').textContent='Play stems'}
+function ui(){
+ $('stList').innerHTML='';
+ N.forEach(n=>{if(!bufs[n])return;const d=document.createElement('div');d.className='saved-item';
+  const b=document.createElement('button');b.className='btn '+(on[n]?'primary':'secondary');b.textContent=(on[n]?'ON: ':'OFF: ')+n;b.onclick=()=>{on[n]=!on[n];stop();ui()};
+  const a=document.createElement('button');a.className='btn secondary';a.textContent='Download '+n+' (WAV)';a.onclick=()=>dlb(blobs[n],n+'.wav');
+  const c=document.createElement('button');c.className='btn secondary';c.textContent='Analyse '+n;c.onclick=()=>window.kmAnalyse&&window.kmAnalyse(bufs[n],n,n==='drums'?'drums':n==='bass'?'bass':'melody');
+  d.append(b,a,c);$('stList').append(d)});
+}
+$('stGo').onclick=async()=>{
+ const f=$('stFile').files[0];if(!f){st('Choose a song first.');return}
+ if(f.size>25e6){st('File is too big. Use a file under 25 MB.');return}
+ $('stGo').disabled=true;st('Uploading...');
+ try{
+  const r=await fetch(W+'/stems',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name),'Content-Type':f.type||'audio/mpeg'},body:f});
+  const j=await r.json();if(!r.ok||!j.id)throw new Error(j.error&&j.error.message||JSON.stringify(j).slice(0,200));
+  st('Splitting... 0%');
+  for(;;){
+   await new Promise(z=>setTimeout(z,4000));
+   const s=await (await fetch(W+'/stems?id='+j.id)).json();
+   if(s.status==='FAILED')throw new Error('Splitting failed. No credits were used.');
+   if(s.status==='COMPLETED'){bufs={};blobs={};
+    for(const n of N){if(!s.outputs||!s.outputs.includes(n))continue;st('Downloading '+n+'...');
+     const b=await (await fetch(W+'/stem?id='+j.id+'&name='+n)).blob();blobs[n]=b;
+     bufs[n]=await new OfflineAudioContext(2,44100,44100).decodeAudioData(await b.arrayBuffer());on[n]=true}
+    ui();st('Done. Use the switches below.');break}
+   st('Splitting... '+(s.progress||0)+'%');
+  }
+ }catch(e){st('Problem: '+e.message)}
+ $('stGo').disabled=false;
+};
+const setOn=v=>{N.forEach(n=>on[n]=v(n));stop();ui()};
+$('stHide').onclick=()=>setOn(n=>n!=='vocals');$('stVoc').onclick=()=>setOn(n=>n==='vocals');$('stAll').onclick=()=>setOn(()=>true);
+$('stPlay').onclick=()=>{
+ if(playing){stop();return}let d=0;pctx=new AudioContext();
+ N.forEach(n=>{if(bufs[n]&&on[n]){const s=pctx.createBufferSource();s.buffer=bufs[n];s.connect(pctx.destination);s.start();d=Math.max(d,bufs[n].duration)}});
+ if(!d){stop();st('Turn at least one stem ON.');return}
+ playing=true;$('stPlay').textContent='Stop';setTimeout(()=>{if(playing)stop()},d*1000+500);
+};
+$('stMixDl').onclick=async()=>{
+ const use=N.filter(n=>bufs[n]&&on[n]);if(!use.length){st('Turn at least one stem ON.');return}
+ const d=Math.max(...use.map(n=>bufs[n].duration)),oc=new OfflineAudioContext(2,Math.ceil(d*44100),44100);
+ use.forEach(n=>{const s=oc.createBufferSource();s.buffer=bufs[n];s.connect(oc.destination);s.start()});
+ st('Rendering...');dlb(window.kmWav(await oc.startRendering()),'stems-mix.wav');st('Mix downloaded.');
+};
 })();
 </script>
 </body></html>
