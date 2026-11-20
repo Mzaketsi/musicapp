@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#111111">
 <title>KM Production — AI Music Studio</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--bg:#101010;--panel:#1b1b1b;--panel2:#242424;--line:#383838;--gold:#d9ad55;--gold2:#f0d18d;--text:#f7f4ed;--muted:#aaa49a;--green:#80c99b}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% -10%,#49391e 0,transparent 34%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
@@ -103,16 +105,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 
 <section class="card" id="beatCard">
 <h3>Beat studio (make your own song)</h3>
-<p class="muted">Tap the squares to place drums and notes, then press Play. Pick a key and scale and every note stays in tune. Load your own drum samples if you want a different sound. Download your beat as a WAV or a MIDI file for your DAW. The sounds are made inside the app.</p>
+<p class="muted">Tap the squares to place drums and notes, then press Play. Pick a key and scale and every note stays in tune. Make up to four patterns (A to D), then line them up into a full song. Record your voice over the beat, and download your work as WAV or MIDI. The sounds are made inside the app.</p>
 <div class="field"><label>Tempo: <span id="bsBpmL">112</span> BPM</label><input id="bsBpm" type="range" min="70" max="150" value="112"></div>
+<div class="field"><label>Swing: <span id="bsSwL">0</span>%</label><input id="bsSwing" type="range" min="0" max="60" value="0"></div>
 <div class="row"><div class="field"><label for="bsRoot">Key</label><select id="bsRoot"></select></div><div class="field"><label for="bsScale">Scale</label><select id="bsScale"><option value="min">Minor</option><option value="maj">Major</option><option value="pent">Minor pentatonic</option></select></div></div>
-<div class="row"><div class="field"><label for="bsBassI">Bass sound</label><select id="bsBassI"><option value="bass">Sub bass</option><option value="pluck">Pluck</option><option value="organ">Organ</option></select></div><div class="field"><label for="bsKeysI">Keys sound</label><select id="bsKeysI"><option value="piano">Piano</option><option value="pad">Pad</option><option value="bell">Bell</option><option value="pluck">Pluck</option><option value="organ">Organ</option></select></div></div>
-<div class="row"><button class="btn primary" id="bsPlay" type="button">Play</button><button class="btn secondary" id="bsDemo" type="button">Amapiano starter</button><button class="btn secondary" id="bsClear" type="button">Clear</button></div>
+<div class="row"><div class="field"><label for="bsKit">Drum kit</label><select id="bsKit"><option value="amapiano">Amapiano</option><option value="gqom">Gqom</option><option value="house">House</option></select></div><div class="field"><label for="bsBassI">Bass sound</label><select id="bsBassI"><option value="bass">Sub bass</option><option value="pluck">Pluck</option><option value="organ">Organ</option><optgroup label="Real sampled sounds (needs internet)"><option value="sf:electric_bass_finger">Finger bass</option><option value="sf:acoustic_bass">Upright bass</option><option value="sf:synth_bass_1">Synth bass</option></optgroup></select></div></div>
+<div class="field"><label for="bsKeysI">Keys sound</label><select id="bsKeysI"><option value="piano">Piano</option><option value="pad">Pad</option><option value="strings">Strings</option><option value="kalimba">Kalimba</option><option value="lead">Synth lead</option><option value="bell">Bell</option><option value="pluck">Pluck</option><option value="organ">Organ</option><optgroup label="Real sampled sounds (needs internet)"><option value="sf:acoustic_grand_piano">Grand piano</option><option value="sf:electric_piano_1">Electric piano</option><option value="sf:string_ensemble_1">Strings</option><option value="sf:marimba">Marimba</option><option value="sf:acoustic_guitar_nylon">Nylon guitar</option><option value="sf:flute">Flute</option><option value="sf:alto_sax">Saxophone</option><option value="sf:brass_section">Brass</option><option value="sf:choir_aahs">Choir</option></optgroup></select></div>
+<div class="field"><label>Pattern you are editing</label><div class="row" id="bsPats"></div></div>
+<div class="row"><button class="btn primary" id="bsPlay" type="button">Play</button><button class="btn secondary" id="bsDemo" type="button">Amapiano starter</button><button class="btn secondary" id="bsClear" type="button">Clear pattern</button></div>
 <div id="bsStatus" class="status"></div>
 <h4 style="margin:12px 0 4px">Drums</h4><div id="bsDrums" style="overflow-x:auto"></div>
 <h4 style="margin:12px 0 4px">Bass notes</h4><div id="bsBass" style="overflow-x:auto"></div>
 <h4 style="margin:12px 0 4px">Keys and melody</h4><div id="bsKeys" style="overflow-x:auto"></div>
-<div class="row" style="margin-top:10px"><button class="btn secondary" id="bsWav" type="button">Download WAV</button><button class="btn secondary" id="bsMidi" type="button">Download MIDI</button></div>
+<div class="field" style="margin-top:12px"><label for="bsSeq">Song order (letters A to D, like A A B B A)</label><input id="bsSeq" type="text" value="A A B A"></div>
+<div class="row"><button class="btn primary" id="bsSong" type="button">Play song</button><button class="btn primary" id="bsRec" type="button">Record vocals over this beat</button></div>
+<p class="muted" style="font-size:12px">Real sampled sounds come from the FluidR3 GM SoundFont through the midi-js-soundfonts project. Check its licence terms (attribution is required) before you release music that uses them.</p>
+<div class="row"><button class="btn secondary" id="bsWav" type="button">Download song WAV</button><button class="btn secondary" id="bsMidi" type="button">Download song MIDI</button></div>
 </section>
 <section class="card" id="mixCard">
 <h3>Mix your voice (effects)</h3>
@@ -149,6 +157,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <button class="btn secondary" id="stMixDl" type="button">Download current mix (WAV)</button>
 <div class="field" style="margin-top:12px"><label for="pjName">Save this project</label><input id="pjName" type="text" placeholder="Project name"><button class="btn secondary" id="pjSave" type="button">Save project</button></div>
 <div id="pjList"></div>
+</section>
+<section class="card" id="relCard">
+<h3>Release checklist</h3>
+<p class="muted">Tick each step as you go. Your ticks are saved on this phone. This is a reminder list, not legal advice.</p>
+<div id="relList"></div>
+<p class="muted" style="margin-top:10px">To install this app: open the Chrome menu and tap Add to Home screen or Install app.</p>
 </section>
 <section class="card" id="aiCard">
 <h3>AI song (ElevenLabs)</h3>
@@ -618,105 +632,174 @@ list();
 <script>
 (()=>{
 const NNm=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],STEPS=32,NR=10;
-const DR=[['Kick',36],['Snare',38],['Clap',39],['Hi-hat',42],['Open hat',46],['Perc',64],['Log drum',45]];
+const DR=[['Kick',36],['Snare',38],['Clap',39],['Hi-hat',42],['Open hat',46],['Perc',64],['Log drum',45],['Shaker',70],['Rim',37],['Tom',47]],DN=DR.length;
 const SC={min:[0,2,3,5,7,8,10],maj:[0,2,4,5,7,9,11],pent:[0,3,5,7,10]};
+const KIT={amapiano:{kf:50,kd:.35,dr:3.2,kv:.9,sn:190,hat:7500},gqom:{kf:58,kd:.45,dr:4,kv:1.2,sn:250,hat:8500},house:{kf:52,kd:.3,dr:3,kv:.95,sn:200,hat:9000}};
 const mk=(r,c)=>Array.from({length:r},()=>Array(c).fill(0));
-let D=mk(7,STEPS),B=mk(NR,STEPS),K=mk(NR,STEPS),samp={},ctx=null,master=null,timer=null,playing=false,step=0,next=0;
-const st=t=>{$('bsStatus').textContent=t};
+const pats=[0,1,2,3].map(()=>({D:mk(DN,STEPS),B:mk(NR,STEPS),K:mk(NR,STEPS)}));
+let cur=0,samp={},ctx=null,master=null,rdest=null,timer=null,playing=false,song=false,songPos=0,step=0,next=0;
+const P=()=>pats[cur],st=t=>{$('bsStatus').textContent=t};
 NNm.forEach((n,i)=>{const o=document.createElement('option');o.value=i;o.textContent=n;$('bsRoot').append(o)});$('bsRoot').value=0;
-const root=()=>+$('bsRoot').value,sc=()=>SC[$('bsScale').value],bpm=()=>+$('bsBpm').value,sd=()=>60/bpm()/4;
+const root=()=>+$('bsRoot').value,sc=()=>SC[$('bsScale').value],bpm=()=>+$('bsBpm').value,sd=()=>60/bpm()/4,sw=()=>sd()*$('bsSwing').value/100*.5;
 const rowMidi=(r,base)=>{const s=sc();return base+root()+12*Math.floor(r/s.length)+s[r%s.length]};
-const bassM=r=>rowMidi(r,24),keysM=r=>rowMidi(r,60);
-const fq=m=>440*Math.pow(2,(m-69)/12);
+const bassM=r=>rowMidi(r,24),keysM=r=>rowMidi(r,60),fq=m=>440*Math.pow(2,(m-69)/12);
 const nz=c=>{if(c._n)return c._n;const b=c.createBuffer(1,c.sampleRate,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return c._n=b};
 function v(c,o,type,f,t,dur,vol,c0,c1,a,drop,det){const s=c.createOscillator(),g=c.createGain(),fl=c.createBiquadFilter();s.type=type;s.frequency.setValueAtTime(f*(drop||1),t);if(drop)s.frequency.exponentialRampToValueAtTime(f,t+.12);if(det)s.detune.value=det;
  fl.type='lowpass';fl.frequency.setValueAtTime(c0||9000,t);if(c1)fl.frequency.exponentialRampToValueAtTime(c1,t+dur);a=a||.005;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+a);g.gain.exponentialRampToValueAtTime(.001,t+dur);s.connect(fl);fl.connect(g);g.connect(o);s.start(t);s.stop(t+dur+.05)}
 function nb(c,o,t,vol,dur,hp,f){const s=c.createBufferSource(),fl=c.createBiquadFilter(),g=c.createGain();s.buffer=nz(c);fl.type=hp?'highpass':'bandpass';fl.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.002);g.gain.exponentialRampToValueAtTime(.001,t+dur);s.connect(fl);fl.connect(g);g.connect(o);s.start(t);s.stop(t+dur+.05)}
 function drum(c,o,i,t){
  if(samp[i]){const s=c.createBufferSource();s.buffer=samp[i];s.connect(o);s.start(t);return}
- if(i===0)v(c,o,'sine',50,t,.35,.9,3000,0,.004,3.2);
- else if(i===1){nb(c,o,t,.4,.15,0,1800);v(c,o,'triangle',190,t,.09,.25)}
+ const k=KIT[$('bsKit').value];
+ if(i===0)v(c,o,'sine',k.kf,t,k.kd,k.kv,3000,0,.004,k.dr);
+ else if(i===1){nb(c,o,t,.4,.15,0,1800);v(c,o,'triangle',k.sn,t,.09,.25)}
  else if(i===2){nb(c,o,t,.3,.02,0,1500);nb(c,o,t+.012,.3,.02,0,1500);nb(c,o,t+.024,.4,.14,0,1500)}
- else if(i===3)nb(c,o,t,.16,.05,1,7500);
- else if(i===4)nb(c,o,t,.12,.3,1,7000);
+ else if(i===3)nb(c,o,t,.16,.05,1,k.hat);
+ else if(i===4)nb(c,o,t,.12,.3,1,k.hat-500);
  else if(i===5)v(c,o,'sine',330,t,.16,.5,3000,0,.003,1.7);
- else{const m=+$('bsRoot').value+36+(sc()[2]||0);v(c,o,'sine',fq(m),t,.4,.8,2500,0,.005,1.6);v(c,o,'triangle',fq(m)*2,t,.12,.12)}
+ else if(i===6){const m=root()+36+(sc()[2]||0);v(c,o,'sine',fq(m),t,.4,.8,2500,0,.005,1.6);v(c,o,'triangle',fq(m)*2,t,.12,.12)}
+ else if(i===7)nb(c,o,t,.1,.07,1,6000);
+ else if(i===8){v(c,o,'sine',820,t,.04,.3);nb(c,o,t,.2,.03,0,3000)}
+ else v(c,o,'sine',120,t,.3,.6,2000,0,.004,2.2);
 }
 const INS={
  piano:(c,o,m,t,d)=>{const x=fq(m);v(c,o,'sine',x,t,Math.max(.5,d),.22,5000,800);v(c,o,'sine',x*2,t,.5,.09);v(c,o,'triangle',x*3,t,.25,.04)},
  pad:(c,o,m,t,d)=>{v(c,o,'sawtooth',fq(m),t,d+.4,.07,900,500,.15,0,-8);v(c,o,'sawtooth',fq(m),t,d+.4,.07,900,500,.15,0,8)},
+ strings:(c,o,m,t,d)=>{[-10,0,10].forEach(x=>v(c,o,'sawtooth',fq(m),t,d+.5,.05,1800,900,.25,0,x))},
+ kalimba:(c,o,m,t,d)=>{const x=fq(m);v(c,o,'sine',x,t,.6,.2);v(c,o,'sine',x*4.1,t,.12,.06)},
+ lead:(c,o,m,t,d)=>{v(c,o,'square',fq(m),t,d+.1,.09,2600,1200,.01,0,6);v(c,o,'square',fq(m),t,d+.1,.07,2600,1200,.01,0,-6)},
  bell:(c,o,m,t,d)=>{const x=fq(m);v(c,o,'sine',x,t,.8,.16);v(c,o,'sine',x*2.76,t,.35,.07)},
  pluck:(c,o,m,t,d)=>{v(c,o,'sawtooth',fq(m),t,.45,.15,3500,400);v(c,o,'triangle',fq(m)*2,t,.25,.04)},
  organ:(c,o,m,t,d)=>{const x=fq(m);[1,2,3].forEach((h,i)=>v(c,o,'sine',x*h,t,d+.1,.1/(i+1),4000,2000,.03))},
  bass:(c,o,m,t,d)=>{v(c,o,'sine',fq(m),t,Math.max(.3,d),.6,900,0);v(c,o,'triangle',fq(m)*2,t,.15,.08)}
 };
-function starts(G,mid){const r={};G.forEach((row,ri)=>{for(let s=0;s<STEPS;s++)if(row[s]&&(s===0||!row[s-1])){let l=1;while(s+l<STEPS&&row[s+l])l++;(r[s]=r[s]||[]).push({m:mid(ri),l})}});return r}
-function sched(c,o,s,t,bs,ks){
- DR.forEach((_,i)=>{if(D[i][s])drum(c,o,i,t)});
- (bs[s]||[]).forEach(n=>INS[$('bsBassI').value](c,o,n.m,t,n.l*sd()*.95));
- (ks[s]||[]).forEach(n=>INS[$('bsKeysI').value](c,o,n.m,t,n.l*sd()*.95));
+
+const SFU='https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/',sfLib={},sfBusy={};
+const k2m=k=>{const m=/^([A-G])([b#]?)(-?\d+)$/.exec(k);if(!m)return null;return({C:0,D:2,E:4,F:5,G:7,A:9,B:11})[m[1]]+(m[2]==='#'?1:m[2]==='b'?-1:0)+(+m[3]+1)*12};
+function sfParse(txt){const m=/Soundfont\.[A-Za-z0-9_]+\s*=\s*\{/.exec(txt);if(!m)throw new Error('format');const i=m.index+m[0].length-1,j=txt.lastIndexOf('}');return JSON.parse(txt.slice(i,j+1))}
+async function loadSF(name){
+ if(sfLib[name])return;if(sfBusy[name])return sfBusy[name];
+ st('Loading real sound... (needs internet, can take a few seconds)');
+ sfBusy[name]=(async()=>{
+  const o=sfParse(await (await fetch(SFU+name+'-mp3.js')).text()),dc=new OfflineAudioContext(2,44100,44100),L=[];
+  for(const k in o){const m=k2m(k);if(m===null||m<28||m>100)continue;
+   try{L.push({m,buf:await dc.decodeAudioData(await (await fetch(o[k])).arrayBuffer())})}catch(e){}}
+  if(!L.length)throw new Error('empty');sfLib[name]=L;st('Real sound ready: '+name.replace(/_/g,' ')+'.');
+ })().catch(e=>{st('Could not load that sound. Check your internet and try again. Using a built-in sound instead.');delete sfBusy[name]});
+ return sfBusy[name];
 }
-function tick(){while(next<ctx.currentTime+.12){sched(ctx,master,step,next,starts(B,bassM),starts(K,keysM));next+=sd();step=(step+1)%STEPS}}
-function stopP(){clearInterval(timer);if(ctx){ctx.close();ctx=null}playing=false;$('bsPlay').textContent='Play'}
-$('bsPlay').onclick=()=>{
- if(playing){stopP();return}
+function sfPlay(c,o,L,m,t,d){
+ let b=L[0];L.forEach(x=>{if(Math.abs(x.m-m)<Math.abs(b.m-m))b=x});
+ const s=c.createBufferSource(),g=c.createGain();s.buffer=b.buf;s.playbackRate.value=Math.pow(2,(m-b.m)/12);
+ g.gain.setValueAtTime(1,t);g.gain.setValueAtTime(1,t+Math.max(.15,d));g.gain.linearRampToValueAtTime(0,t+Math.max(.15,d)+.3);
+ s.connect(g);g.connect(o);s.start(t);s.stop(t+Math.max(.15,d)+.35);
+}
+function inst(id,c,o,m,t,d){
+ const v=$(id).value;
+ if(v.startsWith('sf:')){const L=sfLib[v.slice(3)];if(L){sfPlay(c,o,L,m,t,d);return}INS[id==='bsBassI'?'bass':'piano'](c,o,m,t,d);return}
+ INS[v](c,o,m,t,d);
+}
+['bsBassI','bsKeysI'].forEach(id=>$(id).onchange=()=>{const v=$(id).value;if(v.startsWith('sf:'))loadSF(v.slice(3))});
+function starts(G,mid){const r={};G.forEach((row,ri)=>{for(let s=0;s<STEPS;s++)if(row[s]&&(s===0||!row[s-1])){let l=1;while(s+l<STEPS&&row[s+l])l++;(r[s]=r[s]||[]).push({m:mid(ri),l})}});return r}
+function sched(c,o,s,t,pat,bs,ks){
+ t+=s%2?sw():0;
+ for(let i=0;i<DN;i++)if(pat.D[i][s])drum(c,o,i,t);
+ (bs[s]||[]).forEach(n=>inst('bsBassI',c,o,n.m,t,n.l*sd()*.95));
+ (ks[s]||[]).forEach(n=>inst('bsKeysI',c,o,n.m,t,n.l*sd()*.95));
+}
+const seq=()=>$('bsSeq').value.toUpperCase().split(/[^A-D]+/).filter(Boolean).map(x=>x.charCodeAt(0)-65);
+function curPat(){const q=seq();return song&&q.length?pats[q[songPos%q.length]]:P()}
+function tick(){while(next<ctx.currentTime+.12){const p=curPat();sched(ctx,master,step,next,p,starts(p.B,bassM),starts(p.K,keysM));next+=sd();step=(step+1)%STEPS;if(step===0&&song)songPos++}}
+function startPlay(isSong){
  ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=.8;master.connect(ctx.destination);
- step=0;next=ctx.currentTime+.05;timer=setInterval(tick,25);playing=true;$('bsPlay').textContent='Stop';
-};
+ rdest=ctx.createMediaStreamDestination();master.connect(rdest);
+ song=isSong;songPos=0;step=0;next=ctx.currentTime+.05;timer=setInterval(tick,25);playing=true;
+ $('bsPlay').textContent=isSong?'Play':'Stop';$('bsSong').textContent=isSong?'Stop song':'Play song';
+}
+function stopP(){clearInterval(timer);if(ctx){ctx.close();ctx=null}playing=false;song=false;$('bsPlay').textContent='Play';$('bsSong').textContent='Play song'}
+$('bsPlay').onclick=()=>{if(playing){stopP();return}startPlay(false)};
+$('bsSong').onclick=()=>{if(playing){stopP();return}if(!seq().length){st('Type a song order first, like A A B A.');return}startPlay(true);st('Playing your song order.')};
+function pre(){if(!ctx){ctx=new AudioContext();master=ctx.createGain();master.connect(ctx.destination)}}
 function grid(host,rows,G,label,cls){
  host.innerHTML='';
- rows.forEach((rl,ri)=>{const di=cls==='d'?ri:NR-1-ri;const r=document.createElement('div');r.style.cssText='display:flex;flex-wrap:nowrap;align-items:center;margin:2px 0';
+ rows.forEach((rl,ri)=>{const di=cls==='d'?ri:NR-1-ri,r=document.createElement('div');r.style.cssText='display:flex;flex-wrap:nowrap;align-items:center;margin:2px 0';
   const l=document.createElement('div');l.textContent=label(ri);l.style.cssText='min-width:72px;font-size:12px;color:#d9ccb0;position:sticky;left:0;background:#1b1b1b;padding-right:4px;z-index:1';
-  if(cls==='d'){l.onclick=()=>{if(!ctx){ctx=new AudioContext();master=ctx.createGain();master.connect(ctx.destination)}drum(ctx,master,di,ctx.currentTime+.01)}}
+  if(cls==='d')l.onclick=()=>{pre();drum(ctx,master,di,ctx.currentTime+.01)};
   r.append(l);
   for(let s=0;s<STEPS;s++){const b=document.createElement('button');b.type='button';
    const paint=()=>{b.style.cssText='flex:0 0 30px;height:30px;margin:0 '+(s%4===3?'6px':'2px')+' 0 0;border-radius:6px;border:1px solid #3a3a3a;background:'+(G[di][s]?(cls==='d'?'#e2b04a':cls==='b'?'#d98b3a':'#4ec9b0'):(Math.floor(s/4)%2?'#222':'#2a2a2a'))};
-   paint();b.onclick=()=>{G[di][s]=G[di][s]?0:1;paint();if(!playing&&G[di][s]){if(!ctx){ctx=new AudioContext();master=ctx.createGain();master.connect(ctx.destination)}
-    if(cls==='d')drum(ctx,master,di,ctx.currentTime+.01);else INS[$(cls==='b'?'bsBassI':'bsKeysI').value](ctx,master,(cls==='b'?bassM:keysM)(di),ctx.currentTime+.01,.3)}};
+   paint();b.onclick=()=>{G[di][s]=G[di][s]?0:1;paint();if(!playing&&G[di][s]){pre();
+    if(cls==='d')drum(ctx,master,di,ctx.currentTime+.01);else inst(cls==='b'?'bsBassI':'bsKeysI',ctx,master,(cls==='b'?bassM:keysM)(di),ctx.currentTime+.01,.3)}};
    r.append(b)}
   host.append(r)});
 }
-function nname(m){return NNm[m%12]+(Math.floor(m/12)-1)}
+const nname=m=>NNm[m%12]+(Math.floor(m/12)-1);
 function build(){
- grid($('bsDrums'),DR,D,i=>DR[i][0],'d');
  const rr=[...Array(NR).keys()];
- grid($('bsBass'),rr,B,ri=>nname(bassM(NR-1-ri)),'b');grid($('bsKeys'),rr,K,ri=>nname(keysM(NR-1-ri)),'k');
+ grid($('bsDrums'),DR,P().D,i=>DR[i][0],'d');
+ grid($('bsBass'),rr,P().B,ri=>nname(bassM(NR-1-ri)),'b');grid($('bsKeys'),rr,P().K,ri=>nname(keysM(NR-1-ri)),'k');
+ [...$('bsPats').children].forEach((b,i)=>b.className='btn '+(i===cur?'primary':'secondary'));
 }
-function relabel(){build()}
-['bsRoot','bsScale'].forEach(i=>$(i).onchange=relabel);
-$('bsBpm').oninput=()=>{$('bsBpmL').textContent=$('bsBpm').value};
-$('bsClear').onclick=()=>{D=mk(7,STEPS);B=mk(NR,STEPS);K=mk(NR,STEPS);build()};
+['A','B','C','D'].forEach((n,i)=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.onclick=()=>{cur=i;build()};$('bsPats').append(b)});
+['bsRoot','bsScale'].forEach(i=>$(i).onchange=build);
+$('bsBpm').oninput=()=>{$('bsBpmL').textContent=$('bsBpm').value};$('bsSwing').oninput=()=>{$('bsSwL').textContent=$('bsSwing').value};
+$('bsClear').onclick=()=>{pats[cur]={D:mk(DN,STEPS),B:mk(NR,STEPS),K:mk(NR,STEPS)};build()};
 $('bsDemo').onclick=()=>{
- D=mk(7,STEPS);B=mk(NR,STEPS);K=mk(NR,STEPS);$('bsBpm').value=112;$('bsBpmL').textContent=112;
- [0,4,8,12,16,20,24,28].forEach(s=>D[0][s]=1);[4,12,20,28].forEach(s=>D[2][s]=1);[2,6,10,14,18,22,26,30].forEach(s=>D[3][s]=1);[3,6,10,14,19,22,26,30].forEach(s=>D[6][s]=1);
- [0,1,2,3].forEach(s=>B[0][s]=1);[8,9,10,11].forEach(s=>B[0][s]=1);[16,17,18,19].forEach(s=>B[2][s]=1);[24,25,26,27].forEach(s=>B[4][s]=1);
- [0,6,10,16,22,26].forEach(s=>K[4][s]=1);[2,8,12,18,24,28].forEach(s=>K[6][s]=1);build();st('Starter loaded. Press Play, then change the squares.');
+ const p=pats[cur]={D:mk(DN,STEPS),B:mk(NR,STEPS),K:mk(NR,STEPS)};$('bsBpm').value=112;$('bsBpmL').textContent=112;
+ [0,4,8,12,16,20,24,28].forEach(s=>p.D[0][s]=1);[4,12,20,28].forEach(s=>p.D[2][s]=1);[2,6,10,14,18,22,26,30].forEach(s=>p.D[3][s]=1);[3,6,10,14,19,22,26,30].forEach(s=>p.D[6][s]=1);
+ for(let s=1;s<STEPS;s+=2)p.D[7][s]=1;
+ [0,1,2,3,8,9,10,11].forEach(s=>p.B[0][s]=1);[16,17,18,19].forEach(s=>p.B[2][s]=1);[24,25,26,27].forEach(s=>p.B[4][s]=1);
+ [0,6,10,16,22,26].forEach(s=>p.K[4][s]=1);[2,8,12,18,24,28].forEach(s=>p.K[6][s]=1);build();st('Starter loaded into pattern '+'ABCD'[cur]+'. Press Play, then change the squares.');
 };
-// samples
 (()=>{const h=document.createElement('div');h.style.marginTop='6px';h.innerHTML='<label style="font-size:12px">Load your own drum sample for one row</label><select id="bsSampRow"></select><input id="bsSampFile" type="file" accept="audio/*" style="margin-top:6px">';$('bsDrums').after(h);
  DR.forEach((d,i)=>{const o=document.createElement('option');o.value=i;o.textContent=d[0];$('bsSampRow').append(o)});
  $('bsSampFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{samp[+$('bsSampRow').value]=await new OfflineAudioContext(2,44100,44100).decodeAudioData(await f.arrayBuffer());st('Sample loaded for '+DR[+$('bsSampRow').value][0]+'.')}catch(x){st('Could not read that file.')}}})();
+const order=()=>{const q=seq();return q.length?q:[cur,cur]};
 function allNotes(){
  const out=[];
- DR.forEach((d,i)=>{for(let s=0;s<STEPS;s++)if(D[i][s])out.push({midi:d[1],s,l:1,ch:9})});
- [[B,bassM,0],[K,keysM,1]].forEach(([G,f,ch])=>{const st2=starts(G,f);for(const s in st2)st2[s].forEach(n=>out.push({midi:n.m,s:+s,l:n.l,ch}))});
+ order().forEach((pi,k)=>{const p=pats[pi],o=k*STEPS;
+  DR.forEach((d,i)=>{for(let s=0;s<STEPS;s++)if(p.D[i][s])out.push({midi:d[1],s:o+s,l:1,ch:9})});
+  [[p.B,bassM,0],[p.K,keysM,1]].forEach(([G,f,ch])=>{const q=starts(G,f);for(const s in q)q[s].forEach(n=>out.push({midi:n.m,s:o+(+s),l:n.l,ch}))})});
  return out;
 }
+const dl=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove()};
 $('bsMidi').onclick=()=>{
  const T=480,per=T/4,ev=[];allNotes().forEach(n=>{ev.push([n.s*per,1,n.midi,n.ch]);ev.push([(n.s+n.l)*per-4,0,n.midi,n.ch])});
  ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
  const vlq=x=>{const a=[x&127];while(x>>=7)a.unshift((x&127)|128);return a},us=Math.round(6e7/bpm()),tr=[0,255,81,3,us>>16&255,us>>8&255,us&255];let last=0;
  ev.forEach(([t,on,m,ch])=>{tr.push(...vlq(t-last),(on?0x90:0x80)|ch,m,on?96:0);last=t});tr.push(0,255,47,0);
  const h=[77,84,104,100,0,0,0,6,0,0,0,1,T>>8,T&255,77,84,114,107,tr.length>>24&255,tr.length>>16&255,tr.length>>8&255,tr.length&255];
- const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([new Uint8Array([...h,...tr])],{type:'audio/midi'}));a.download='my-beat.mid';document.body.append(a);a.click();a.remove();st('MIDI downloaded. Drums are on channel 10.');
+ dl(new Blob([new Uint8Array([...h,...tr])],{type:'audio/midi'}),'my-song.mid');st('MIDI downloaded. Drums are on channel 10.');
 };
 $('bsWav').onclick=async()=>{
- st('Rendering your beat...');const loops=2,dur=loops*STEPS*sd()+2,oc=new OfflineAudioContext(2,Math.ceil(dur*44100),44100),o=oc.createGain();o.gain.value=.8;o.connect(oc.destination);
- const bs=starts(B,bassM),ks=starts(K,keysM);
- for(let l=0;l<loops;l++)for(let s=0;s<STEPS;s++)sched(oc,o,s,(l*STEPS+s)*sd(),bs,ks);
- const r=await oc.startRendering(),a=document.createElement('a');a.href=URL.createObjectURL(window.kmWav(r));a.download='my-beat.wav';document.body.append(a);a.click();a.remove();st('WAV downloaded (2 loops).');
+ st('Rendering your song...');const q=order(),dur=q.length*STEPS*sd()+2,oc=new OfflineAudioContext(2,Math.ceil(dur*44100),44100),o=oc.createGain();o.gain.value=.8;o.connect(oc.destination);
+ q.forEach((pi,k)=>{const p=pats[pi],bs=starts(p.B,bassM),ks=starts(p.K,keysM);for(let s=0;s<STEPS;s++)sched(oc,o,s,(k*STEPS+s)*sd(),p,bs,ks)});
+ dl(window.kmWav(await oc.startRendering()),'my-song.wav');st('Song WAV downloaded.');
+};
+let mic=null,vrec=null,brec=null,vch=[],bch=[],recording=false;
+$('bsRec').onclick=async()=>{
+ if(recording){vrec.stop();brec.stop();return}
+ try{mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}})}catch(e){st('Microphone blocked. Allow it for this site in Chrome and try again.');return}
+ if(playing)stopP();startPlay(false);
+ vch=[];bch=[];vrec=new MediaRecorder(mic);brec=new MediaRecorder(rdest.stream);
+ vrec.ondataavailable=e=>{if(e.data.size)vch.push(e.data)};brec.ondataavailable=e=>{if(e.data.size)bch.push(e.data)};
+ let n=2;const fin=()=>{if(--n)return;mic.getTracks().forEach(t=>t.stop());stopP();recording=false;$('bsRec').textContent='Record vocals over this beat';
+  window.kmTake={voice:new Blob(vch,{type:'audio/webm'}),back:new Blob(bch,{type:'audio/webm'}),backUrl:null};if(window.kmTakeReady)window.kmTakeReady();
+  st('Recorded. Scroll to Mix your voice to add reverb, then download.')};
+ vrec.onstop=fin;brec.onstop=fin;vrec.start();brec.start();recording=true;$('bsRec').textContent='Stop recording';st('Recording... sing over the beat. Use headphones.');
 };
 build();
+})();
+</script>
+<script>
+(()=>{
+const items=['I wrote the lyrics and melody myself, or I know exactly which parts the AI made.','I recorded my own voice, or I have written permission for any voice I use.','I kept my project files, drafts and recordings, with dates, as proof of what I made.','Every sample, loop and sound is mine or properly licensed.','I checked my AI tool terms for what I plan to do (selling, streaming, radio). Some plans exclude radio.','I checked my distributor rules on AI-generated music and will label the song as they require.','I will register the song with SAMRO and say honestly how much AI was used.','I agreed songwriter splits in writing with everyone who helped.','The cover art is mine or properly licensed.','I listened on a phone speaker, headphones and a big speaker, and checked the volume.'];
+let saved={};try{saved=JSON.parse(localStorage.getItem('kmRelease')||'{}')}catch(e){}
+const L=$('relList');
+items.forEach((t,i)=>{const lab=document.createElement('label');lab.className='checkline';lab.style.cssText='display:flex;gap:9px;align-items:flex-start;margin:8px 0;font-weight:400;font-size:14px';
+ const c=document.createElement('input');c.type='checkbox';c.style.cssText='width:20px;height:20px;flex:0 0 20px;margin-top:2px';c.checked=!!saved[i];
+ c.onchange=()=>{saved[i]=c.checked;try{localStorage.setItem('kmRelease',JSON.stringify(saved))}catch(e){}};
+ const s=document.createElement('span');s.textContent=t;lab.append(c,s);L.append(lab)});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
 </body></html>
