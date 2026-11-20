@@ -111,6 +111,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <div class="row"><div class="field"><label for="bsRoot">Key</label><select id="bsRoot"></select></div><div class="field"><label for="bsScale">Scale</label><select id="bsScale"><option value="min">Minor</option><option value="maj">Major</option><option value="pent">Minor pentatonic</option></select></div></div>
 <div class="row"><div class="field"><label for="bsKit">Drum kit</label><select id="bsKit"><option value="amapiano">Amapiano</option><option value="gqom">Gqom</option><option value="house">House</option></select></div><div class="field"><label for="bsBassI">Bass sound</label><select id="bsBassI"><option value="bass">Sub bass</option><option value="pluck">Pluck</option><option value="organ">Organ</option><optgroup label="Real sampled sounds (needs internet)"><option value="sf:electric_bass_finger">Finger bass</option><option value="sf:acoustic_bass">Upright bass</option><option value="sf:synth_bass_1">Synth bass</option></optgroup></select></div></div>
 <div class="field"><label for="bsKeysI">Keys sound</label><select id="bsKeysI"><option value="piano">Piano</option><option value="pad">Pad</option><option value="strings">Strings</option><option value="kalimba">Kalimba</option><option value="lead">Synth lead</option><option value="bell">Bell</option><option value="pluck">Pluck</option><option value="organ">Organ</option><optgroup label="Real sampled sounds (needs internet)"><option value="sf:acoustic_grand_piano">Grand piano</option><option value="sf:electric_piano_1">Electric piano</option><option value="sf:string_ensemble_1">Strings</option><option value="sf:marimba">Marimba</option><option value="sf:acoustic_guitar_nylon">Nylon guitar</option><option value="sf:flute">Flute</option><option value="sf:alto_sax">Saxophone</option><option value="sf:brass_section">Brass</option><option value="sf:choir_aahs">Choir</option></optgroup></select></div>
+<div id="sfMsg" class="status"></div>
 <div class="field"><label>Pattern you are editing</label><div class="row" id="bsPats"></div></div>
 <div class="row"><button class="btn primary" id="bsPlay" type="button">Play</button><button class="btn secondary" id="bsDemo" type="button">Amapiano starter</button><button class="btn secondary" id="bsClear" type="button">Clear pattern</button></div>
 <div id="bsStatus" class="status"></div>
@@ -673,18 +674,21 @@ const INS={
  bass:(c,o,m,t,d)=>{v(c,o,'sine',fq(m),t,Math.max(.3,d),.6,900,0);v(c,o,'triangle',fq(m)*2,t,.15,.08)}
 };
 
-const SFU='https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/',sfLib={},sfBusy={};
+const SFU=['https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/','https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/gh-pages/FluidR3_GM/'],sfLib={},sfBusy={};
 const k2m=k=>{const m=/^([A-G])([b#]?)(-?\d+)$/.exec(k);if(!m)return null;return({C:0,D:2,E:4,F:5,G:7,A:9,B:11})[m[1]]+(m[2]==='#'?1:m[2]==='b'?-1:0)+(+m[3]+1)*12};
 function sfParse(txt){const m=/Soundfont\.[A-Za-z0-9_]+\s*=\s*\{/.exec(txt);if(!m)throw new Error('format');const i=m.index+m[0].length-1,j=txt.lastIndexOf('}');return JSON.parse(txt.slice(i,j+1))}
+const sm=t=>{$('sfMsg').textContent=t};
+async function getSF(name){let err;for(const u of SFU){try{const r=await fetch(u+name+'-mp3.js');if(!r.ok)throw new Error('HTTP '+r.status);return sfParse(await r.text())}catch(e){err=e}}throw err}
 async function loadSF(name){
- if(sfLib[name])return;if(sfBusy[name])return sfBusy[name];
- st('Loading real sound... (needs internet, can take a few seconds)');
+ const nice=name.replace(/_/g,' ');
+ if(sfLib[name]){sm('Ready: '+nice);return}if(sfBusy[name])return sfBusy[name];
+ sm('Loading '+nice+'... this can take 10 to 30 seconds on a phone. Keep this page open.');
  sfBusy[name]=(async()=>{
-  const o=sfParse(await (await fetch(SFU+name+'-mp3.js')).text()),dc=new OfflineAudioContext(2,44100,44100),L=[];
-  for(const k in o){const m=k2m(k);if(m===null||m<28||m>100)continue;
-   try{L.push({m,buf:await dc.decodeAudioData(await (await fetch(o[k])).arrayBuffer())})}catch(e){}}
-  if(!L.length)throw new Error('empty');sfLib[name]=L;st('Real sound ready: '+name.replace(/_/g,' ')+'.');
- })().catch(e=>{st('Could not load that sound. Check your internet and try again. Using a built-in sound instead.');delete sfBusy[name]});
+  const o=await getSF(name),dc=new OfflineAudioContext(2,44100,44100),ks=Object.keys(o).filter(k=>{const m=k2m(k);return m!==null&&m>=28&&m<=100&&m%2===0}),L=[];let n=0;
+  for(let i=0;i<ks.length;i+=6){await Promise.all(ks.slice(i,i+6).map(async k=>{try{L.push({m:k2m(k),buf:await dc.decodeAudioData(await (await fetch(o[k])).arrayBuffer())})}catch(e){}n++}));sm('Loading '+nice+'... '+Math.min(n,ks.length)+' of '+ks.length)}
+  if(!L.length)throw new Error('no samples decoded');
+  sfLib[name]=L;sm('Ready: '+nice+'. Press Play to hear it.');pre();sfPlay(ctx,master,L,60,ctx.currentTime+.05,.8);
+ })().catch(e=>{sm('Could not load this sound ('+(e.message||'error')+'). Check your internet and try again. The app uses a built-in sound instead.');delete sfBusy[name]});
  return sfBusy[name];
 }
 function sfPlay(c,o,L,m,t,d){
@@ -698,7 +702,7 @@ function inst(id,c,o,m,t,d){
  if(v.startsWith('sf:')){const L=sfLib[v.slice(3)];if(L){sfPlay(c,o,L,m,t,d);return}INS[id==='bsBassI'?'bass':'piano'](c,o,m,t,d);return}
  INS[v](c,o,m,t,d);
 }
-['bsBassI','bsKeysI'].forEach(id=>$(id).onchange=()=>{const v=$(id).value;if(v.startsWith('sf:'))loadSF(v.slice(3))});
+['bsBassI','bsKeysI'].forEach(id=>$(id).onchange=()=>{const v=$(id).value;if(v.startsWith('sf:'))loadSF(v.slice(3));else sm('')});
 function starts(G,mid){const r={};G.forEach((row,ri)=>{for(let s=0;s<STEPS;s++)if(row[s]&&(s===0||!row[s-1])){let l=1;while(s+l<STEPS&&row[s+l])l++;(r[s]=r[s]||[]).push({m:mid(ri),l})}});return r}
 function sched(c,o,s,t,pat,bs,ks){
  t+=s%2?sw():0;
