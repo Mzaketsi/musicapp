@@ -111,6 +111,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <div class="row"><div class="field"><label for="bsRoot">Key</label><select id="bsRoot"></select></div><div class="field"><label for="bsScale">Scale</label><select id="bsScale"><option value="min">Minor</option><option value="maj">Major</option><option value="pent">Minor pentatonic</option></select></div></div>
 <div class="row"><div class="field"><label for="bsKit">Drum kit</label><select id="bsKit"><option value="amapiano">Amapiano</option><option value="gqom">Gqom</option><option value="house">House</option></select></div><div class="field"><label for="bsBassI">Bass sound</label><select id="bsBassI"><option value="bass">Sub bass</option><option value="pluck">Pluck</option><option value="organ">Organ</option><optgroup label="Real sampled sounds (needs internet)"><option value="sf:electric_bass_finger">Finger bass</option><option value="sf:acoustic_bass">Upright bass</option><option value="sf:synth_bass_1">Synth bass</option></optgroup></select></div></div>
 <div class="field"><label for="bsKeysI">Keys sound</label><select id="bsKeysI"><option value="piano">Piano</option><option value="pad">Pad</option><option value="strings">Strings</option><option value="kalimba">Kalimba</option><option value="lead">Synth lead</option><option value="bell">Bell</option><option value="pluck">Pluck</option><option value="organ">Organ</option><optgroup label="Real sampled sounds (needs internet)"><option value="sf:acoustic_grand_piano">Grand piano</option><option value="sf:electric_piano_1">Electric piano</option><option value="sf:string_ensemble_1">Strings</option><option value="sf:marimba">Marimba</option><option value="sf:acoustic_guitar_nylon">Nylon guitar</option><option value="sf:flute">Flute</option><option value="sf:alto_sax">Saxophone</option><option value="sf:brass_section">Brass</option><option value="sf:choir_aahs">Choir</option></optgroup></select></div>
+<div class="field"><label>Drums level: <span id="bsVdL">100</span>%</label><input id="bsVd" type="range" min="0" max="150" value="100"></div>
+<div class="field"><label>Bass level: <span id="bsVbL">100</span>%</label><input id="bsVb" type="range" min="0" max="150" value="100"></div>
+<div class="field"><label>Keys level: <span id="bsVkL">100</span>%</label><input id="bsVk" type="range" min="0" max="150" value="100"></div>
+<div class="field"><label>Master volume: <span id="bsVmL">100</span>%</label><input id="bsVm" type="range" min="0" max="125" value="100"></div>
+<div class="field"><label for="bsPercI">Perc and log drum sound</label><select id="bsPercI"><option value="syn">Built-in</option><optgroup label="Real sampled sounds (needs internet)"><option value="sf:marimba">Marimba (log drum feel)</option><option value="sf:woodblock">Woodblock</option><option value="sf:steel_drums">Steel drums</option><option value="sf:taiko_drum">Taiko drum</option><option value="sf:melodic_tom">Melodic tom</option><option value="sf:agogo">Agogo</option></optgroup></select></div>
 <div id="sfMsg" class="status"></div>
 <div class="field"><label>Pattern you are editing</label><div class="row" id="bsPats"></div></div>
 <div class="row"><button class="btn primary" id="bsPlay" type="button">Play</button><button class="btn secondary" id="bsDemo" type="button">Amapiano starter</button><button class="btn secondary" id="bsClear" type="button">Clear pattern</button></div>
@@ -122,6 +127,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <div class="row"><button class="btn primary" id="bsSong" type="button">Play song</button><button class="btn primary" id="bsRec" type="button">Record vocals over this beat</button></div>
 <p class="muted" style="font-size:12px">Real sampled sounds come from the FluidR3 GM SoundFont through the midi-js-soundfonts project. Check its licence terms (attribution is required) before you release music that uses them.</p>
 <div class="row"><button class="btn secondary" id="bsWav" type="button">Download song WAV</button><button class="btn secondary" id="bsMidi" type="button">Download song MIDI</button></div>
+<div class="field" style="margin-top:12px"><label for="bsName">Save this beat or song</label><input id="bsName" type="text" placeholder="Name, like Amapiano idea 1"><button class="btn secondary" id="bsSave" type="button">Save on this phone</button></div>
+<div id="bsSaved"></div>
+</section>
+<section class="card" id="chkCard">
+<h3>Health check</h3>
+<p class="muted">Tap the button to test that everything in the app works on this phone. It does not use any credits.</p>
+<button class="btn secondary" id="chkGo" type="button">Run health check</button>
+<div id="chkOut" class="status" style="white-space:pre-wrap;margin-top:8px"></div>
 </section>
 <section class="card" id="mixCard">
 <h3>Mix your voice (effects)</h3>
@@ -656,8 +669,8 @@ function drum(c,o,i,t){
  else if(i===2){nb(c,o,t,.3,.02,0,1500);nb(c,o,t+.012,.3,.02,0,1500);nb(c,o,t+.024,.4,.14,0,1500)}
  else if(i===3)nb(c,o,t,.16,.05,1,k.hat);
  else if(i===4)nb(c,o,t,.12,.3,1,k.hat-500);
- else if(i===5)v(c,o,'sine',330,t,.16,.5,3000,0,.003,1.7);
- else if(i===6){const m=root()+36+(sc()[2]||0);v(c,o,'sine',fq(m),t,.4,.8,2500,0,.005,1.6);v(c,o,'triangle',fq(m)*2,t,.12,.12)}
+ else if(i===5){if(!rp(c,o,60,t,.3))v(c,o,'sine',330,t,.16,.5,3000,0,.003,1.7)}
+ else if(i===6){const m=root()+36+(sc()[2]||0);if(!rp(c,o,m+12,t,.4)){v(c,o,'sine',fq(m),t,.4,.8,2500,0,.005,1.6);v(c,o,'triangle',fq(m)*2,t,.12,.12)}}
  else if(i===7)nb(c,o,t,.1,.07,1,6000);
  else if(i===8){v(c,o,'sine',820,t,.04,.3);nb(c,o,t,.2,.03,0,3000)}
  else v(c,o,'sine',120,t,.3,.6,2000,0,.004,2.2);
@@ -697,24 +710,27 @@ function sfPlay(c,o,L,m,t,d){
  g.gain.setValueAtTime(1,t);g.gain.setValueAtTime(1,t+Math.max(.15,d));g.gain.linearRampToValueAtTime(0,t+Math.max(.15,d)+.3);
  s.connect(g);g.connect(o);s.start(t);s.stop(t+Math.max(.15,d)+.35);
 }
+const rp=(c,o,m,t,d)=>{const x=$('bsPercI').value;if(!x.startsWith('sf:'))return false;const L=sfLib[x.slice(3)];if(!L)return false;sfPlay(c,o,L,m,t,d);return true};
 function inst(id,c,o,m,t,d){
  const v=$(id).value;
  if(v.startsWith('sf:')){const L=sfLib[v.slice(3)];if(L){sfPlay(c,o,L,m,t,d);return}INS[id==='bsBassI'?'bass':'piano'](c,o,m,t,d);return}
  INS[v](c,o,m,t,d);
 }
-['bsBassI','bsKeysI'].forEach(id=>$(id).onchange=()=>{const v=$(id).value;if(v.startsWith('sf:'))loadSF(v.slice(3));else sm('')});
+['bsBassI','bsKeysI','bsPercI'].forEach(id=>$(id).onchange=()=>{const v=$(id).value;if(v.startsWith('sf:'))loadSF(v.slice(3));else sm('')});
 function starts(G,mid){const r={};G.forEach((row,ri)=>{for(let s=0;s<STEPS;s++)if(row[s]&&(s===0||!row[s-1])){let l=1;while(s+l<STEPS&&row[s+l])l++;(r[s]=r[s]||[]).push({m:mid(ri),l})}});return r}
+const lv=()=>({d:$('bsVd').value/100,b:$('bsVb').value/100,k:$('bsVk').value/100});
+const gr=(c,o)=>{if(!c._grp){const m=()=>{const g=c.createGain();g.connect(o);return g};c._grp={d:m(),b:m(),k:m()}}const V=lv();c._grp.d.gain.value=V.d;c._grp.b.gain.value=V.b;c._grp.k.gain.value=V.k;return c._grp};
 function sched(c,o,s,t,pat,bs,ks){
- t+=s%2?sw():0;
- for(let i=0;i<DN;i++)if(pat.D[i][s])drum(c,o,i,t);
- (bs[s]||[]).forEach(n=>inst('bsBassI',c,o,n.m,t,n.l*sd()*.95));
- (ks[s]||[]).forEach(n=>inst('bsKeysI',c,o,n.m,t,n.l*sd()*.95));
+ t+=s%2?sw():0;const G=gr(c,o);
+ for(let i=0;i<DN;i++)if(pat.D[i][s])drum(c,G.d,i,t);
+ (bs[s]||[]).forEach(n=>inst('bsBassI',c,G.b,n.m,t,n.l*sd()*.95));
+ (ks[s]||[]).forEach(n=>inst('bsKeysI',c,G.k,n.m,t,n.l*sd()*.95));
 }
 const seq=()=>$('bsSeq').value.toUpperCase().split(/[^A-D]+/).filter(Boolean).map(x=>x.charCodeAt(0)-65);
 function curPat(){const q=seq();return song&&q.length?pats[q[songPos%q.length]]:P()}
 function tick(){while(next<ctx.currentTime+.12){const p=curPat();sched(ctx,master,step,next,p,starts(p.B,bassM),starts(p.K,keysM));next+=sd();step=(step+1)%STEPS;if(step===0&&song)songPos++}}
 function startPlay(isSong){
- ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=.8;master.connect(ctx.destination);
+ ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=$('bsVm').value/100*.8;master.connect(ctx.destination);
  rdest=ctx.createMediaStreamDestination();master.connect(rdest);
  song=isSong;songPos=0;step=0;next=ctx.currentTime+.05;timer=setInterval(tick,25);playing=true;
  $('bsPlay').textContent=isSong?'Play':'Stop';$('bsSong').textContent=isSong?'Stop song':'Play song';
@@ -745,6 +761,7 @@ function build(){
 }
 ['A','B','C','D'].forEach((n,i)=>{const b=document.createElement('button');b.type='button';b.textContent=n;b.onclick=()=>{cur=i;build()};$('bsPats').append(b)});
 ['bsRoot','bsScale'].forEach(i=>$(i).onchange=build);
+[['bsVd','bsVdL'],['bsVb','bsVbL'],['bsVk','bsVkL'],['bsVm','bsVmL']].forEach(([a,b])=>$(a).oninput=()=>{$(b).textContent=$(a).value;if(a==='bsVm'&&master)master.gain.value=$(a).value/100*.8});
 $('bsBpm').oninput=()=>{$('bsBpmL').textContent=$('bsBpm').value};$('bsSwing').oninput=()=>{$('bsSwL').textContent=$('bsSwing').value};
 $('bsClear').onclick=()=>{pats[cur]={D:mk(DN,STEPS),B:mk(NR,STEPS),K:mk(NR,STEPS)};build()};
 $('bsDemo').onclick=()=>{
@@ -775,7 +792,7 @@ $('bsMidi').onclick=()=>{
  dl(new Blob([new Uint8Array([...h,...tr])],{type:'audio/midi'}),'my-song.mid');st('MIDI downloaded. Drums are on channel 10.');
 };
 $('bsWav').onclick=async()=>{
- st('Rendering your song...');const q=order(),dur=q.length*STEPS*sd()+2,oc=new OfflineAudioContext(2,Math.ceil(dur*44100),44100),o=oc.createGain();o.gain.value=.8;o.connect(oc.destination);
+ st('Rendering your song...');const q=order(),dur=q.length*STEPS*sd()+2,oc=new OfflineAudioContext(2,Math.ceil(dur*44100),44100),o=oc.createGain();o.gain.value=$('bsVm').value/100*.8;o.connect(oc.destination);
  q.forEach((pi,k)=>{const p=pats[pi],bs=starts(p.B,bassM),ks=starts(p.K,keysM);for(let s=0;s<STEPS;s++)sched(oc,o,s,(k*STEPS+s)*sd(),p,bs,ks)});
  dl(window.kmWav(await oc.startRendering()),'my-song.wav');st('Song WAV downloaded.');
 };
@@ -791,6 +808,24 @@ $('bsRec').onclick=async()=>{
   st('Recorded. Scroll to Mix your voice to add reverb, then download.')};
  vrec.onstop=fin;brec.onstop=fin;vrec.start();brec.start();recording=true;$('bsRec').textContent='Stop recording';st('Recording... sing over the beat. Use headphones.');
 };
+const snap=()=>({bpm:bpm(),sw:+$('bsSwing').value,root:root(),scale:$('bsScale').value,kit:$('bsKit').value,bi:$('bsBassI').value,ki:$('bsKeysI').value,pi:$('bsPercI').value,lv:['bsVd','bsVb','bsVk','bsVm'].map(i=>$(i).value),seq:$('bsSeq').value,pats});
+function applySnap(d){
+ $('bsBpm').value=d.bpm;$('bsBpmL').textContent=d.bpm;$('bsSwing').value=d.sw;$('bsSwL').textContent=d.sw;$('bsRoot').value=d.root;$('bsScale').value=d.scale;$('bsKit').value=d.kit;
+ [['bsBassI',d.bi],['bsKeysI',d.ki],['bsPercI',d.pi]].forEach(([id,v])=>{$(id).value=v;if(v&&v.startsWith('sf:'))loadSF(v.slice(3))});
+ ['bsVd','bsVb','bsVk','bsVm'].forEach((id,i)=>{$(id).value=d.lv[i];$(id+'L').textContent=d.lv[i]});$('bsSeq').value=d.seq;
+ d.pats.forEach((p,i)=>pats[i]=p);cur=0;build();
+}
+const LS='kmBeats',getAll=()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){return{}}};
+function listSaved(){
+ const L=$('bsSaved');L.innerHTML='';const all=getAll();
+ Object.keys(all).forEach(n=>{const d=document.createElement('div');d.className='saved-item';const t=document.createElement('strong');t.textContent=n;
+  const l=document.createElement('button');l.type='button';l.className='btn secondary';l.textContent='Load';l.onclick=()=>{applySnap(all[n]);st('Loaded '+n+'.')};
+  const x=document.createElement('button');x.type='button';x.className='btn secondary';x.textContent='Delete';x.onclick=()=>{const a=getAll();delete a[n];try{localStorage.setItem(LS,JSON.stringify(a))}catch(e){}listSaved()};
+  d.append(t,l,x);L.append(d)});
+}
+$('bsSave').onclick=()=>{const n=$('bsName').value.trim();if(!n){st('Type a name first.');return}
+ try{const a=getAll();a[n]=snap();localStorage.setItem(LS,JSON.stringify(a));st('Saved on this phone. Your own drum samples are not saved.');listSaved()}catch(e){st('Could not save on this phone.')}};
+listSaved();
 build();
 })();
 </script>
@@ -806,4 +841,22 @@ items.forEach((t,i)=>{const lab=document.createElement('label');lab.className='c
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
-</body></html>
+
+<script>
+(()=>{
+const W='https://km-music.kmproduction626.workers.dev';
+$('chkGo').onclick=async()=>{
+ const o=$('chkOut'),L=[],ok=(n,v,x)=>L.push((v?'OK     ':'FAILED ')+n+(x?' ('+x+')':''));
+ o.textContent='Checking...';
+ ok('Audio engine',!!(window.AudioContext||window.webkitAudioContext));
+ try{new OfflineAudioContext(2,44100,44100);ok('Rendering and downloads',true)}catch(e){ok('Rendering and downloads',false)}
+ ok('Microphone recording',!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder));
+ try{localStorage.setItem('kmT','1');localStorage.removeItem('kmT');ok('Saving beats',true)}catch(e){ok('Saving beats',false)}
+ try{await new Promise((r,j)=>{const q=indexedDB.open('kmprod',1);q.onupgradeneeded=()=>q.result.createObjectStore('p',{keyPath:'name'});q.onsuccess=()=>r();q.onerror=()=>j()});ok('Saving stem projects',true)}catch(e){ok('Saving stem projects',false)}
+ try{const r=await navigator.serviceWorker.getRegistration();ok('App install files',!!r,r?'':'open the page once more')}catch(e){ok('App install files',false)}
+ try{const t=await (await fetch(W+'/')).text();ok('Worker (stems and AI songs)',t.includes('KM Music Worker'))}catch(e){ok('Worker (stems and AI songs)',false,'no connection')}
+ try{const r=await fetch('https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/marimba-mp3.js',{method:'HEAD'});ok('Real sampled sounds',r.ok)}catch(e){ok('Real sampled sounds',false,'no connection')}
+ o.textContent=L.join('\n');
+};
+})();
+</script></body></html>
