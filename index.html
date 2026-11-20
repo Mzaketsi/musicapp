@@ -124,15 +124,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold)}textarea{min-he
 <div class="row"><button class="btn secondary hidden" id="refTxt" type="button">Download notes (.txt)</button></div>
 </section>
 <section class="card" id="stemCard">
-<h3>Split a song into stems</h3>
-<p class="muted">Upload a song under 25 MB. The app splits it into vocals, drums, bass and other. Each stem has an ON/OFF switch, a WAV download and an Analyse button. Only use songs you have the rights to. Each minute of audio uses one StemSplit minute.</p>
+<h3>Stems and multitrack mixer</h3>
+<p class="muted">Split a song (under 25 MB) into vocals, drums, bass and other, or load stems you already have. Each track has volume, mute and solo, a WAV download and an Analyse button. Only use songs you have the rights to. Each minute of audio uses one StemSplit minute.</p>
 <input id="stFile" type="file" accept="audio/*">
 <button class="btn primary" id="stGo" type="button" style="margin-top:8px">Split into stems</button>
+<div class="field" style="margin-top:12px"><label for="stFiles">Or load stems you already have (pick several files)</label><input id="stFiles" type="file" accept="audio/*" multiple></div>
 <div id="stStatus" class="status"></div>
 <div class="row"><button class="btn secondary" id="stHide" type="button">Instrumental (hide vocals)</button><button class="btn secondary" id="stVoc" type="button">Vocals only</button></div>
-<div class="row"><button class="btn secondary" id="stAll" type="button">All on</button><button class="btn primary" id="stPlay" type="button">Play stems</button></div>
-<button class="btn secondary" id="stMixDl" type="button">Download current mix (WAV)</button>
+<div class="row"><button class="btn secondary" id="stAll" type="button">All tracks on</button><button class="btn primary" id="stPlay" type="button">Play stems</button></div>
 <div id="stList"></div>
+<button class="btn secondary" id="stMixDl" type="button">Download current mix (WAV)</button>
+<div class="field" style="margin-top:12px"><label for="pjName">Save this project</label><input id="pjName" type="text" placeholder="Project name"><button class="btn secondary" id="pjSave" type="button">Save project</button></div>
+<div id="pjList"></div>
 </section>
 <section class="card" id="aiCard">
 <h3>AI song (ElevenLabs)</h3>
@@ -503,19 +506,36 @@ $('refTxt').onclick=()=>{const r=res[$('refMode').value];r&&dl(new Blob([r.text]
 </script>
 <script>
 (()=>{
-const W='https://km-music.kmproduction626.workers.dev',N=['vocals','drums','bass','other'];
+const W='https://km-music.kmproduction626.workers.dev',KEYS=['vocals','drums','bass','other'],COL={vocals:'#7ed957',drums:'#f0b23c',bass:'#ffd84a',other:'#38d4b5'};
 const st=t=>{$('stStatus').textContent=t};
-let bufs={},blobs={},on={},playing=false,pctx=null;
+let bufs={},blobs={},vol={},mute={},solo={},pctx=null,gains={},playing=false;
+const names=()=>Object.keys(bufs);
 const dlb=(b,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove()};
-function stop(){if(pctx){pctx.close();pctx=null}playing=false;$('stPlay').textContent='Play stems'}
+const dec=b=>b.arrayBuffer().then(a=>new OfflineAudioContext(2,44100,44100).decodeAudioData(a));
+const eff=n=>{const any=names().some(k=>solo[k]);return(any?(solo[n]?1:0):(mute[n]?0:1))*vol[n]/100};
+const applyGains=()=>{for(const n in gains)gains[n].gain.value=eff(n)};
+function stop(){if(pctx){pctx.close();pctx=null}gains={};playing=false;$('stPlay').textContent='Play stems'}
+function wave(c,buf,col){const w=c.width,h=c.height,g=c.getContext('2d'),d=buf.getChannelData(0),step=Math.max(1,Math.floor(d.length/w)),sk=Math.max(1,step>>6);
+ g.fillStyle='#111';g.fillRect(0,0,w,h);g.fillStyle=col;
+ for(let x=0;x<w;x++){let m=0;for(let i=x*step;i<(x+1)*step&&i<d.length;i+=sk){const v=Math.abs(d[i]);if(v>m)m=v}const hh=Math.max(1,m*h);g.fillRect(x,(h-hh)/2,1,hh)}}
 function ui(){
- $('stList').innerHTML='';
- N.forEach(n=>{if(!bufs[n])return;const d=document.createElement('div');d.className='saved-item';
-  const b=document.createElement('button');b.className='btn '+(on[n]?'primary':'secondary');b.textContent=(on[n]?'ON: ':'OFF: ')+n;b.onclick=()=>{on[n]=!on[n];stop();ui()};
-  const a=document.createElement('button');a.className='btn secondary';a.textContent='Download '+n+' (WAV)';a.onclick=()=>dlb(blobs[n],n+'.wav');
-  const c=document.createElement('button');c.className='btn secondary';c.textContent='Analyse '+n;c.onclick=()=>window.kmAnalyse&&window.kmAnalyse(bufs[n],n,n==='drums'?'drums':n==='bass'?'bass':'melody');
-  d.append(b,a,c);$('stList').append(d)});
+ const L=$('stList');L.innerHTML='';
+ names().forEach(n=>{
+  const d=document.createElement('div');d.className='saved-item';
+  const t=document.createElement('strong');t.textContent=n;
+  const c=document.createElement('canvas');c.width=600;c.height=44;c.style.cssText='width:100%;border-radius:8px;margin:6px 0;display:block';wave(c,bufs[n],COL[n]||'#c9b8ff');
+  const r=document.createElement('div');r.className='row';
+  const m=document.createElement('button'),s=document.createElement('button');
+  const paint=()=>{m.className='btn '+(mute[n]?'primary':'secondary');m.textContent=mute[n]?'Muted':'Mute';s.className='btn '+(solo[n]?'primary':'secondary');s.textContent=solo[n]?'Solo on':'Solo'};
+  m.type=s.type='button';m.onclick=()=>{mute[n]=!mute[n];paint();applyGains()};s.onclick=()=>{solo[n]=!solo[n];ui();applyGains()};paint();
+  const v=document.createElement('input');v.type='range';v.min=0;v.max=150;v.value=vol[n];v.oninput=()=>{vol[n]=+v.value;applyGains()};
+  r.append(m,s);
+  const r2=document.createElement('div');r2.className='row';
+  const a=document.createElement('button');a.type='button';a.className='btn secondary';a.textContent='Download WAV';a.onclick=()=>dlb(window.kmWav(bufs[n]),n+'.wav');
+  const z=document.createElement('button');z.type='button';z.className='btn secondary';z.textContent='Analyse';z.onclick=()=>window.kmAnalyse&&window.kmAnalyse(bufs[n],n,n==='drums'?'drums':n==='bass'?'bass':'melody');
+  r2.append(a,z);d.append(t,c,r,v,r2);L.append(d)});
 }
+function setTracks(o){bufs=o.bufs;blobs=o.blobs||{};vol={};mute={};solo={};names().forEach(n=>{vol[n]=100;mute[n]=false;solo[n]=false});stop();ui()}
 $('stGo').onclick=async()=>{
  const f=$('stFile').files[0];if(!f){st('Choose a song first.');return}
  if(f.size>25e6){st('File is too big. Use a file under 25 MB.');return}
@@ -528,30 +548,58 @@ $('stGo').onclick=async()=>{
    await new Promise(z=>setTimeout(z,4000));
    const s=await (await fetch(W+'/stems?id='+j.id)).json();
    if(s.status==='FAILED')throw new Error('Splitting failed. No credits were used.');
-   if(s.status==='COMPLETED'){bufs={};blobs={};
-    for(const n of N){if(!s.outputs||!s.outputs.includes(n))continue;st('Downloading '+n+'...');
-     const b=await (await fetch(W+'/stem?id='+j.id+'&name='+n)).blob();blobs[n]=b;
-     bufs[n]=await new OfflineAudioContext(2,44100,44100).decodeAudioData(await b.arrayBuffer());on[n]=true}
-    ui();st('Done. Use the switches below.');break}
+   if(s.status==='COMPLETED'){const B={},K={};
+    for(const n of KEYS){if(!s.outputs||!s.outputs.includes(n))continue;st('Downloading '+n+'...');
+     const b=await (await fetch(W+'/stem?id='+j.id+'&name='+n)).blob();K[n]=b;B[n]=await dec(b)}
+    setTracks({bufs:B,blobs:K});st('Done. Use volume, mute and solo below.');break}
    st('Splitting... '+(s.progress||0)+'%');
   }
  }catch(e){st('Problem: '+e.message)}
  $('stGo').disabled=false;
 };
-const setOn=v=>{N.forEach(n=>on[n]=v(n));stop();ui()};
-$('stHide').onclick=()=>setOn(n=>n!=='vocals');$('stVoc').onclick=()=>setOn(n=>n==='vocals');$('stAll').onclick=()=>setOn(()=>true);
+$('stFiles').onchange=async e=>{
+ st('Loading tracks...');const B={},K={};
+ try{for(const f of e.target.files){const l=f.name.toLowerCase();
+  let k=/vocal|acap|voice/.test(l)?'vocals':/drum|perc/.test(l)?'drums':/bass/.test(l)?'bass':/other|instr/.test(l)?'other':f.name.replace(/\.[^.]+$/,'').slice(0,20);
+  while(B[k])k+='_';K[k]=f;B[k]=await dec(f)}
+  setTracks({bufs:B,blobs:K});st('Loaded '+names().length+' tracks.');
+ }catch(err){st('Could not read one of the files. Try MP3 or WAV.')}
+};
+const setAll=(m,s)=>{names().forEach(n=>{mute[n]=m(n);solo[n]=s(n)});ui();applyGains()};
+$('stHide').onclick=()=>{if(!bufs.vocals){st('No vocals track found.');return}setAll(n=>n==='vocals',()=>false)};
+$('stVoc').onclick=()=>{if(!bufs.vocals){st('No vocals track found.');return}setAll(()=>false,n=>n==='vocals')};
+$('stAll').onclick=()=>setAll(()=>false,()=>false);
 $('stPlay').onclick=()=>{
- if(playing){stop();return}let d=0;pctx=new AudioContext();
- N.forEach(n=>{if(bufs[n]&&on[n]){const s=pctx.createBufferSource();s.buffer=bufs[n];s.connect(pctx.destination);s.start();d=Math.max(d,bufs[n].duration)}});
- if(!d){stop();st('Turn at least one stem ON.');return}
- playing=true;$('stPlay').textContent='Stop';setTimeout(()=>{if(playing)stop()},d*1000+500);
+ if(playing){stop();return}if(!names().length){st('Split or load tracks first.');return}
+ pctx=new AudioContext();let d=0;
+ names().forEach(n=>{const s=pctx.createBufferSource(),g=pctx.createGain();s.buffer=bufs[n];s.connect(g);g.connect(pctx.destination);gains[n]=g;s.start();d=Math.max(d,bufs[n].duration)});
+ applyGains();playing=true;$('stPlay').textContent='Stop';setTimeout(()=>{if(playing)stop()},d*1000+500);
 };
 $('stMixDl').onclick=async()=>{
- const use=N.filter(n=>bufs[n]&&on[n]);if(!use.length){st('Turn at least one stem ON.');return}
- const d=Math.max(...use.map(n=>bufs[n].duration)),oc=new OfflineAudioContext(2,Math.ceil(d*44100),44100);
- use.forEach(n=>{const s=oc.createBufferSource();s.buffer=bufs[n];s.connect(oc.destination);s.start()});
+ if(!names().length){st('Split or load tracks first.');return}
+ const d=Math.max(...names().map(n=>bufs[n].duration)),oc=new OfflineAudioContext(2,Math.ceil(d*44100),44100);
+ names().forEach(n=>{const s=oc.createBufferSource(),g=oc.createGain();s.buffer=bufs[n];g.gain.value=eff(n);s.connect(g);g.connect(oc.destination);s.start()});
  st('Rendering...');dlb(window.kmWav(await oc.startRendering()),'stems-mix.wav');st('Mix downloaded.');
 };
+const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('kmprod',1);r.onupgradeneeded=()=>r.result.createObjectStore('p',{keyPath:'name'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const tx=async(m,f)=>{const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('p',m),q=f(t.objectStore('p'));t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error)})};
+async function list(){
+ const L=$('pjList');L.innerHTML='';
+ try{const all=await tx('readonly',s=>s.getAll());
+  (all||[]).sort((a,b)=>b.date-a.date).forEach(p=>{const d=document.createElement('div');d.className='saved-item';
+   const t=document.createElement('strong');t.textContent=p.name+' - '+new Date(p.date).toLocaleDateString();
+   const l=document.createElement('button');l.type='button';l.className='btn secondary';l.textContent='Load';
+   l.onclick=async()=>{st('Loading project...');const B={};for(const n in p.blobs)B[n]=await dec(p.blobs[n]);setTracks({bufs:B,blobs:p.blobs});vol=p.vol;mute=p.mute;solo=p.solo;ui();st('Project loaded.')};
+   const x=document.createElement('button');x.type='button';x.className='btn secondary';x.textContent='Delete';x.onclick=async()=>{await tx('readwrite',s=>s.delete(p.name));list()};
+   d.append(t,l,x);L.append(d)});
+ }catch(e){L.textContent='Saving is not available in this browser.'}
+}
+$('pjSave').onclick=async()=>{
+ const name=$('pjName').value.trim();if(!name){st('Type a project name first.');return}
+ if(!names().length){st('Split or load tracks first.');return}
+ try{await tx('readwrite',s=>s.put({name,date:Date.now(),blobs,vol,mute,solo}));st('Project saved on this phone.');list()}catch(e){st('Could not save. Your phone may be low on storage.')}
+};
+list();
 })();
 </script>
 </body></html>
