@@ -676,7 +676,7 @@ const INS={
 
 const SFU=['https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/','https://raw.githubusercontent.com/gleitz/midi-js-soundfonts/gh-pages/FluidR3_GM/'],sfLib={},sfBusy={};
 const k2m=k=>{const m=/^([A-G])([b#]?)(-?\d+)$/.exec(k);if(!m)return null;return({C:0,D:2,E:4,F:5,G:7,A:9,B:11})[m[1]]+(m[2]==='#'?1:m[2]==='b'?-1:0)+(+m[3]+1)*12};
-function sfParse(txt){const m=/Soundfont\.[A-Za-z0-9_]+\s*=\s*\{/.exec(txt);if(!m)throw new Error('format');const i=m.index+m[0].length-1,j=txt.lastIndexOf('}');return JSON.parse(txt.slice(i,j+1))}
+function sfParse(txt){const m=/Soundfont\.[A-Za-z0-9_]+\s*=\s*\{/.exec(txt);if(!m)throw new Error('format');const i=m.index+m[0].length-1,j=txt.lastIndexOf('}');return JSON.parse(txt.slice(i,j+1).replace(/,\s*\}$/,'}'))}
 const sm=t=>{$('sfMsg').textContent=t};
 async function getSF(name){let err;for(const u of SFU){try{const r=await fetch(u+name+'-mp3.js');if(!r.ok)throw new Error('HTTP '+r.status);return sfParse(await r.text())}catch(e){err=e}}throw err}
 async function loadSF(name){
